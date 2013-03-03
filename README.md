@@ -1,4 +1,2 @@
-datatable
+Javascrpt DataTable
 =========
-
-datatable
