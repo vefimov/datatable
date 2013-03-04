@@ -70,7 +70,7 @@ class Ex.DataTable
       fields: null # list of the fields
       sortedBy:
         key: null,
-        asc: true
+        dir: "ASC"
 
     @container = jQuery container
     @cfg = $.extend(defaults, configs)
@@ -78,6 +78,8 @@ class Ex.DataTable
     @theadEl = jQuery "<thead />"
     @tbodyEl = jQuery "<tbody />"
     @container.empty().append(@theadEl).append(@tbodyEl)
+    @renderColumns()
+    @render()
 
   getStore: ->
     @get("store")
@@ -100,7 +102,21 @@ class Ex.DataTable
   render: ->
     storeData = @getStore().getData()
     columns = @get("columns")
-
+    sortedBy = @get("sortedBy")
+    
+    # sort the data
+    storeData.sort (a, b) ->
+      asc = sortedBy.dir is "ASC"
+      val1 = a[sortedBy.key]
+      val2 = b[sortedBy.key]
+      if val1 < val2
+        return if asc then -1 else 1
+      if val1 is val2
+        return 0
+      else
+        return if asc then 1 else -1
+    
+    @tbodyEl.empty()
     for record in storeData
       trEl = jQuery "<tr />"
       for column in columns
@@ -109,16 +125,21 @@ class Ex.DataTable
         trEl.append tdEl
       @tbodyEl.append trEl
 
-
-
-
   ###
    * Custom event handler to sort Column.
   ###
   onEventSortColumn: (column, event) =>
     if column.sortable
-      b = 1
-    #  // Update UI via sortedBy
+      dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
+      # Update UI via sortedBy
+      @sortColumn column, dir
+  
+  ###
+   * Sorts given Column. 
+  ###
+  sortColumn: (column, dir) ->
+    @set("sortedBy", key: column.key, dir: dir)
+    @render()
 
 
 ###
@@ -126,14 +147,19 @@ class Ex.DataTable
 ###
 class Ex.Store
   $.extend @prototype, Ex.AttributeProvider.prototype
+  
+  _data: []
+  
   constructor: (configs) ->
     @__init()
-    @cfg = configs
-
-
-
+    @setData configs.data
+    @cfg = {}
+  
+  setData: (data) ->
+    @_data = jQuery.extend [], data
+  
   getData: ->
-    @get("data")
+    @_data
 
 ###
  * Small helper class to make creating stores from Array data easier

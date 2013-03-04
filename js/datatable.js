@@ -112,7 +112,7 @@
         fields: null,
         sortedBy: {
           key: null,
-          asc: true
+          dir: "ASC"
         }
       };
       this.container = jQuery(container);
@@ -120,6 +120,8 @@
       this.theadEl = jQuery("<thead />");
       this.tbodyEl = jQuery("<tbody />");
       this.container.empty().append(this.theadEl).append(this.tbodyEl);
+      this.renderColumns();
+      this.render();
     }
 
     DataTable.prototype.getStore = function() {
@@ -146,9 +148,33 @@
 
 
     DataTable.prototype.render = function() {
-      var column, columns, record, storeData, tdEl, trEl, _i, _j, _len, _len1, _results;
+      var column, columns, record, sortedBy, storeData, tdEl, trEl, _i, _j, _len, _len1, _results;
       storeData = this.getStore().getData();
       columns = this.get("columns");
+      sortedBy = this.get("sortedBy");
+      storeData.sort(function(a, b) {
+        var asc, val1, val2;
+        asc = sortedBy.dir === "ASC";
+        val1 = a[sortedBy.key];
+        val2 = b[sortedBy.key];
+        if (val1 < val2) {
+          if (asc) {
+            return -1;
+          } else {
+            return 1;
+          }
+        }
+        if (val1 === val2) {
+          return 0;
+        } else {
+          if (asc) {
+            return 1;
+          } else {
+            return -1;
+          }
+        }
+      });
+      this.tbodyEl.empty();
       _results = [];
       for (_i = 0, _len = storeData.length; _i < _len; _i++) {
         record = storeData[_i];
@@ -170,10 +196,24 @@
 
 
     DataTable.prototype.onEventSortColumn = function(column, event) {
-      var b;
+      var dir;
       if (column.sortable) {
-        return b = 1;
+        dir = this.get("sortedBy").dir === "ASC" ? "DESC" : "ASC";
+        return this.sortColumn(column, dir);
       }
+    };
+
+    /*
+     * Sorts given Column.
+    */
+
+
+    DataTable.prototype.sortColumn = function(column, dir) {
+      this.set("sortedBy", {
+        key: column.key,
+        dir: dir
+      });
+      return this.render();
     };
 
     return DataTable;
@@ -189,13 +229,20 @@
 
     $.extend(Store.prototype, Ex.AttributeProvider.prototype);
 
+    Store.prototype._data = [];
+
     function Store(configs) {
       this.__init();
-      this.cfg = configs;
+      this.setData(configs.data);
+      this.cfg = {};
     }
 
+    Store.prototype.setData = function(data) {
+      return this._data = jQuery.extend([], data);
+    };
+
     Store.prototype.getData = function() {
-      return this.get("data");
+      return this._data;
     };
 
     return Store;
