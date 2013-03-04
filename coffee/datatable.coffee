@@ -92,6 +92,10 @@ class Ex.DataTable
       thEl = jQuery "<th />"
       thEl.append jQuery("<div />").text(column.label)
       thEl.on "click", @onEventSortColumn.bind null, column
+      
+      if column.hidden
+        thEl.addClass("hidden").css("display", "none")
+      
       theadRowEl.append thEl
 
     @theadEl.append theadRowEl
@@ -122,6 +126,10 @@ class Ex.DataTable
       for column in columns
         tdEl = jQuery "<td />"
         tdEl.append jQuery("<div />").text(record[column.key])
+        
+        if column.hidden
+          tdEl.addClass("hidden").css("display", "none")
+        
         trEl.append tdEl
       @tbodyEl.append trEl
 

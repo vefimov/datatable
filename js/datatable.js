@@ -137,6 +137,9 @@
         thEl = jQuery("<th />");
         thEl.append(jQuery("<div />").text(column.label));
         thEl.on("click", this.onEventSortColumn.bind(null, column));
+        if (column.hidden) {
+          thEl.addClass("hidden").css("display", "none");
+        }
         theadRowEl.append(thEl);
       }
       return this.theadEl.append(theadRowEl);
@@ -183,6 +186,9 @@
           column = columns[_j];
           tdEl = jQuery("<td />");
           tdEl.append(jQuery("<div />").text(record[column.key]));
+          if (column.hidden) {
+            tdEl.addClass("hidden").css("display", "none");
+          }
           trEl.append(tdEl);
         }
         _results.push(this.tbodyEl.append(trEl));
