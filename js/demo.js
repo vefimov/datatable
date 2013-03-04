@@ -5,7 +5,7 @@
   example = {};
 
   $(function() {
-    var columns, data, fields, fistNameFormatter, i, rowFormatter, store;
+    var columns, data, fistNameFormatter, i, rowFormatter, store;
     fistNameFormatter = function(tdEl, column, data) {
       if (!(data.id % 10)) {
         tdEl.css("background", "rgb(199, 255, 199)");
@@ -21,7 +21,12 @@
       {
         key: "id",
         label: "#",
-        sortable: true,
+        sortable: false,
+        hidden: false
+      }, {
+        key: "hidden",
+        label: "Hidden",
+        sortable: false,
         hidden: true
       }, {
         key: "first_name",
@@ -37,12 +42,12 @@
         hidden: false
       }
     ];
-    fields = ["id", "first_name", "last_name"];
     data = [];
     i = 1;
     while (i < 200) {
       data.push({
         "id": i,
+        "hidden": i,
         "first_name": "First Name " + i,
         "last_name": "Last Name " + i
       });
@@ -53,7 +58,6 @@
     });
     return example.datatable = new Ex.DataTable("table", {
       columns: columns,
-      fields: fields,
       store: store,
       rowFormatter: rowFormatter,
       sortedBy: {

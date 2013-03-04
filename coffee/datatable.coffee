@@ -67,7 +67,7 @@ class Ex.DataTable
     defaults =
       columns: [] # Array of object literal Column definitions.
       store: null # DataSource instance
-      fields: null # list of the fields
+      #fields: null # list of the fields
       sortedBy:
         key: null,
         dir: "ASC"
@@ -79,23 +79,47 @@ class Ex.DataTable
     @tbodyEl = jQuery "<tbody />"
     @container.empty().append(@theadEl).append(@tbodyEl)
     @renderColumns()
-    @render()
-
+    
+    sortedBy = @get("sortedBy")
+    if sortedBy.key
+      @sortColumn(@getColumn("key", sortedBy.key), sortedBy.dir)
+    else
+      @render()
+  
+  ###
+   * Find column by attribute name and its value
+  ###
+  getColumn: (attrName, attrValue) ->
+    columns = @get("columns")
+    for column in columns
+      return column if column[attrName] is attrValue
+    return null
+  
+  ###
+   * Get store instance
+  ###
   getStore: ->
     @get("store")
 
+  ###
+   * Render the TH elements
+  ###
   renderColumns: ->
     theadRowEl = jQuery "<tr />"
     columns = @get("columns")
 
     for column in columns
       thEl = jQuery "<th />"
+      
+      # add css classes to th element
+      thEl.addClass("ex-dt-sortable") if column.sortable
+      thEl.addClass("ex-dt-hidden").css("display", "none") if column.hidden
+      thEl.addClass("ex-dt-col-#{column.key}")
+      
       thEl.append jQuery("<div />").text(column.label)
       thEl.on "click", @onEventSortColumn.bind null, column
-      
-      if column.hidden
-        thEl.addClass("hidden").css("display", "none")
-      
+        
+      column.thEl = thEl
       theadRowEl.append thEl
 
     @theadEl.append theadRowEl
@@ -125,7 +149,9 @@ class Ex.DataTable
     @tbodyEl.empty()
     for record in storeData
       trEl = jQuery "<tr />"
+      #yui-dt-even
       rowFormatter?(trEl, record)
+      trEl.addClass "ex-dt-#{if _i % 2 then 'odd' else 'even'}"
       
       for column in columns
         tdEl = jQuery "<td />"
@@ -146,16 +172,20 @@ class Ex.DataTable
    * Custom event handler to sort Column.
   ###
   onEventSortColumn: (column, event) =>
+    console.time "Sorting"
     if column.sortable
       dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
       # Update UI via sortedBy
       @sortColumn column, dir
+    console.timeEnd "Sorting"
   
   ###
    * Sorts given Column. 
   ###
   sortColumn: (column, dir) ->
     @set("sortedBy", key: column.key, dir: dir)
+    column.thEl.parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc")
+    column.thEl.addClass "ex-dt-#{dir.toLowerCase()}"
     @render()
 
 

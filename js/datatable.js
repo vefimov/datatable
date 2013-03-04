@@ -104,12 +104,11 @@
 
     function DataTable(container, configs) {
       this.onEventSortColumn = __bind(this.onEventSortColumn, this);
-      var defaults;
+      var defaults, sortedBy;
       this.__init();
       defaults = {
         columns: [],
         store: null,
-        fields: null,
         sortedBy: {
           key: null,
           dir: "ASC"
@@ -121,12 +120,44 @@
       this.tbodyEl = jQuery("<tbody />");
       this.container.empty().append(this.theadEl).append(this.tbodyEl);
       this.renderColumns();
-      this.render();
+      sortedBy = this.get("sortedBy");
+      if (sortedBy.key) {
+        this.sortColumn(this.getColumn("key", sortedBy.key), sortedBy.dir);
+      } else {
+        this.render();
+      }
     }
+
+    /*
+     * Find column by attribute name and its value
+    */
+
+
+    DataTable.prototype.getColumn = function(attrName, attrValue) {
+      var column, columns, _i, _len;
+      columns = this.get("columns");
+      for (_i = 0, _len = columns.length; _i < _len; _i++) {
+        column = columns[_i];
+        if (column[attrName] === attrValue) {
+          return column;
+        }
+      }
+      return null;
+    };
+
+    /*
+     * Get store instance
+    */
+
 
     DataTable.prototype.getStore = function() {
       return this.get("store");
     };
+
+    /*
+     * Render the TH elements
+    */
+
 
     DataTable.prototype.renderColumns = function() {
       var column, columns, thEl, theadRowEl, _i, _len;
@@ -135,11 +166,16 @@
       for (_i = 0, _len = columns.length; _i < _len; _i++) {
         column = columns[_i];
         thEl = jQuery("<th />");
+        if (column.sortable) {
+          thEl.addClass("ex-dt-sortable");
+        }
+        if (column.hidden) {
+          thEl.addClass("ex-dt-hidden").css("display", "none");
+        }
+        thEl.addClass("ex-dt-col-" + column.key);
         thEl.append(jQuery("<div />").text(column.label));
         thEl.on("click", this.onEventSortColumn.bind(null, column));
-        if (column.hidden) {
-          thEl.addClass("hidden").css("display", "none");
-        }
+        column.thEl = thEl;
         theadRowEl.append(thEl);
       }
       return this.theadEl.append(theadRowEl);
@@ -187,6 +223,7 @@
         if (typeof rowFormatter === "function") {
           rowFormatter(trEl, record);
         }
+        trEl.addClass("ex-dt-" + (_i % 2 ? 'odd' : 'even'));
         for (_j = 0, _len1 = columns.length; _j < _len1; _j++) {
           column = columns[_j];
           tdEl = jQuery("<td />");
@@ -212,10 +249,12 @@
 
     DataTable.prototype.onEventSortColumn = function(column, event) {
       var dir;
+      console.time("Sorting");
       if (column.sortable) {
         dir = this.get("sortedBy").dir === "ASC" ? "DESC" : "ASC";
-        return this.sortColumn(column, dir);
+        this.sortColumn(column, dir);
       }
+      return console.timeEnd("Sorting");
     };
 
     /*
@@ -228,6 +267,8 @@
         key: column.key,
         dir: dir
       });
+      column.thEl.parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc");
+      column.thEl.addClass("ex-dt-" + (dir.toLowerCase()));
       return this.render();
     };
 

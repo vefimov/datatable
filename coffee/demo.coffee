@@ -15,7 +15,12 @@ $ ->
   columns = [
     key: "id"
     label: "#"
-    sortable: true
+    sortable: false
+    hidden: false
+  ,
+    key: "hidden"
+    label: "Hidden"
+    sortable: false
     hidden: true
   ,
     key: "first_name"
@@ -31,7 +36,7 @@ $ ->
     hidden: false
   ]
 
-  fields = ["id", "first_name", "last_name"]
+  #fields = ["id", "first_name", "last_name"]
   
   data = []
   
@@ -39,6 +44,7 @@ $ ->
   while i < 200
     data.push
       "id" : i
+      "hidden" : i
       "first_name": "First Name #{i}",
       "last_name": "Last Name #{i}"      
     i++
@@ -48,7 +54,7 @@ $ ->
 
   example.datatable = new Ex.DataTable "table",
     columns: columns
-    fields: fields
+    #fields: fields
     store: store
     rowFormatter: rowFormatter
     sortedBy:

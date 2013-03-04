@@ -1,0 +1,22 @@
+th{
+    background: black;
+    color: white;
+}
+
+th.ex-dt-desc,
+th.ex-dt-asc{
+    background: rgb(122, 122, 122);
+    color: black;
+}
+
+th.ex-dt-sortable{
+    cursor: pointer;
+}
+
+.table tbody > tr.ex-dt-even{
+    background-color: #f9f9f9;
+}
+
+.table tbody > tr:hover{
+    background: rgb(140, 217, 255);
+}
