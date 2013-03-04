@@ -60,6 +60,10 @@
       columns: columns,
       store: store,
       rowFormatter: rowFormatter,
+      paginator: new Ex.Paginator({
+        containers: '.pagination',
+        totalRecords: 200
+      }),
       sortedBy: {
         key: "id",
         dir: "ASC"

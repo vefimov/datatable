@@ -65,6 +65,7 @@ class Ex.DataTable
   constructor: (container, configs) ->
     @__init()
     defaults =
+      paginator: null
       columns: [] # Array of object literal Column definitions.
       store: null # DataSource instance
       #fields: null # list of the fields
@@ -215,4 +216,90 @@ class Ex.ArrayStore extends Ex.Store
   constructor: (configs) ->
     super
 
-
+###
+ * Paginator 
+ * Parameters:
+ *    config <Object> Object literal to set instance and ui component configuration.
+###
+class Ex.Paginator
+  $.extend @prototype, Ex.AttributeProvider.prototype
+  
+  _currentPage: 1
+  
+  constructor: (config) ->
+    @__init()
+    defaults =
+      rowsPerPage: 30
+      containers: ''
+      totalRecords: 0
+    
+    config = $.extend(defaults, config)
+    config.containers = $(config.containers)
+    @cfg = config
+    
+    config.containers.on("click", "li", @_handleStateChange)
+    @_initUIComponents()
+    @_selfSubscribe()
+    @render()
+    
+  updateVisibility: ->
+    
+  ###
+   * Render the pagination controls per the format attribute into the specified container nodes.
+  ###
+  render: =>
+    totalRecords = +@get("totalRecords")
+    rowsPerPage = +@get("rowsPerPage")
+    containers = @get("containers")
+    
+    containers.find(".ex-pg-page").remove()
+    nextEl = containers.find(".ex-pg-next")
+    
+    totalPages = totalRecords / rowsPerPage
+    totalPages++ if totalPages > Math.floor(totalPages)
+    
+    i = @getCurrentPage()
+    while i <= totalPages
+      liEl = jQuery("<li />", class: "ex-pg-page").append(
+        jQuery("<a />", href: "#", text: i)
+      )
+      liEl.insertBefore(nextEl)
+      
+      i++
+       
+  getCurrentPage: ->
+    return @_currentPage
+    
+  ###
+   * Set the current page to the provided page number if possible.
+   * Parameters:
+   *  newPage <number> the new page number
+  ###
+  setPage: (newPage)->
+    @_currentPage = newPage 
+    
+  ###
+   *  Fires the pageChange event when the state attributes have changed
+  ###
+  _handleStateChange: (event)->
+    
+    
+  ###
+   * Subscribes to instance attribute change events to automate certain behaviors.
+  ###
+  _selfSubscribe: ->
+    @on "totalRecordsChange", @render
+  
+    
+  _initUIComponents: ->
+    ulEl = jQuery("<ul />", class: "ex-pg")
+    ulEl.append(
+      jQuery("<li />", class: "ex-pg-first").append(jQuery("<a />", href: "#", text: "First"))
+      jQuery("<li />", class: "ex-pg-prev").append(jQuery("<a />", href: "#", text: "Prev"))
+      jQuery("<li />", class: "ex-pg-next").append(jQuery("<a />", href: "#", text: "Next"))
+      jQuery("<li />", class: "ex-pg-last").append(jQuery("<a />", href: "#", text: "Last"))
+    )
+    
+    @get("containers").empty().append(ulEl)
+    
+  

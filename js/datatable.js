@@ -107,6 +107,7 @@
       var defaults, sortedBy;
       this.__init();
       defaults = {
+        paginator: null,
         columns: [],
         store: null,
         sortedBy: {
@@ -321,5 +322,133 @@
     return ArrayStore;
 
   })(Ex.Store);
+
+  /*
+   * Paginator 
+   * Parameters:
+   *    config <Object> Object literal to set instance and ui component configuration.
+  */
+
+
+  Ex.Paginator = (function() {
+
+    $.extend(Paginator.prototype, Ex.AttributeProvider.prototype);
+
+    Paginator.prototype._currentPage = 1;
+
+    function Paginator(config) {
+      this.render = __bind(this.render, this);
+      var defaults;
+      this.__init();
+      defaults = {
+        rowsPerPage: 30,
+        containers: '',
+        totalRecords: 0
+      };
+      config = $.extend(defaults, config);
+      config.containers = $(config.containers);
+      this.cfg = config;
+      config.containers.on("click", "li", this._handleStateChange);
+      this._initUIComponents();
+      this._selfSubscribe();
+      this.render();
+    }
+
+    Paginator.prototype.updateVisibility = function() {};
+
+    /*
+     * Render the pagination controls per the format attribute into the specified container nodes.
+    */
+
+
+    Paginator.prototype.render = function() {
+      var containers, i, liEl, nextEl, rowsPerPage, totalPages, totalRecords, _results;
+      totalRecords = +this.get("totalRecords");
+      rowsPerPage = +this.get("rowsPerPage");
+      containers = this.get("containers");
+      containers.find(".ex-pg-page").remove();
+      nextEl = containers.find(".ex-pg-next");
+      totalPages = totalRecords / rowsPerPage;
+      if (totalPages > Math.floor(totalPages)) {
+        totalPages++;
+      }
+      i = this.getCurrentPage();
+      _results = [];
+      while (i <= totalPages) {
+        liEl = jQuery("<li />", {
+          "class": "ex-pg-page"
+        }).append(jQuery("<a />", {
+          href: "#",
+          text: i
+        }));
+        liEl.insertBefore(nextEl);
+        _results.push(i++);
+      }
+      return _results;
+    };
+
+    Paginator.prototype.getCurrentPage = function() {
+      return this._currentPage;
+    };
+
+    /*
+     * Set the current page to the provided page number if possible.
+     * Parameters:
+     *  newPage <number> the new page number
+    */
+
+
+    Paginator.prototype.setPage = function(newPage) {
+      return this._currentPage = newPage;
+    };
+
+    /*
+     *  Fires the pageChange event when the state attributes have changed
+    */
+
+
+    Paginator.prototype._handleStateChange = function(event) {};
+
+    /*
+     * Subscribes to instance attribute change events to automate certain behaviors.
+    */
+
+
+    Paginator.prototype._selfSubscribe = function() {
+      return this.on("totalRecordsChange", this.render);
+    };
+
+    Paginator.prototype._initUIComponents = function() {
+      var ulEl;
+      ulEl = jQuery("<ul />", {
+        "class": "ex-pg"
+      });
+      ulEl.append(jQuery("<li />", {
+        "class": "ex-pg-first"
+      }).append(jQuery("<a />", {
+        href: "#",
+        text: "First"
+      })), jQuery("<li />", {
+        "class": "ex-pg-prev"
+      }).append(jQuery("<a />", {
+        href: "#",
+        text: "Prev"
+      })), jQuery("<li />", {
+        "class": "ex-pg-next"
+      }).append(jQuery("<a />", {
+        href: "#",
+        text: "Next"
+      })), jQuery("<li />", {
+        "class": "ex-pg-last"
+      }).append(jQuery("<a />", {
+        href: "#",
+        text: "Last"
+      })));
+      return this.get("containers").empty().append(ulEl);
+    };
+
+    return Paginator;
+
+  })();
 
 }).call(this);
