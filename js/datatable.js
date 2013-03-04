@@ -151,10 +151,12 @@
 
 
     DataTable.prototype.render = function() {
-      var column, columns, record, sortedBy, storeData, tdEl, trEl, _i, _j, _len, _len1, _results;
-      storeData = this.getStore().getData();
+      var column, columns, record, rowFormatter, sortedBy, store, storeData, tdEl, trEl, _i, _j, _len, _len1, _results;
+      store = this.getStore();
+      storeData = store.getData();
       columns = this.get("columns");
       sortedBy = this.get("sortedBy");
+      rowFormatter = this.get("rowFormatter");
       storeData.sort(function(a, b) {
         var asc, val1, val2;
         asc = sortedBy.dir === "ASC";
@@ -182,10 +184,17 @@
       for (_i = 0, _len = storeData.length; _i < _len; _i++) {
         record = storeData[_i];
         trEl = jQuery("<tr />");
+        if (typeof rowFormatter === "function") {
+          rowFormatter(trEl, record);
+        }
         for (_j = 0, _len1 = columns.length; _j < _len1; _j++) {
           column = columns[_j];
           tdEl = jQuery("<td />");
-          tdEl.append(jQuery("<div />").text(record[column.key]));
+          if (typeof column.formatter === "function") {
+            column.formatter(tdEl, column, record);
+          } else {
+            tdEl.append(jQuery("<div />").text(record[column.key]));
+          }
           if (column.hidden) {
             tdEl.addClass("hidden").css("display", "none");
           }

@@ -1,6 +1,17 @@
 example = {}
 
 $ ->
+  
+  fistNameFormatter = (tdEl, column, data) ->
+    unless data.id % 10
+      tdEl.css("background", "rgb(199, 255, 199)")
+    tdEl.text(data.first_name)
+  
+  
+  rowFormatter = (trEl, data) ->
+    trEl.addClass("error") unless data.id % 20
+    
+  
   columns = [
     key: "id"
     label: "#"
@@ -9,7 +20,7 @@ $ ->
   ,
     key: "first_name"
     label: "First Name"
-    formatter: null
+    formatter: fistNameFormatter
     sortable: true
     hidden: false
   ,
@@ -39,6 +50,7 @@ $ ->
     columns: columns
     fields: fields
     store: store
+    rowFormatter: rowFormatter
     sortedBy:
       key: "id"
       dir: "ASC"

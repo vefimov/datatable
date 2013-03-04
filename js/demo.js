@@ -5,7 +5,18 @@
   example = {};
 
   $(function() {
-    var columns, data, fields, i, store;
+    var columns, data, fields, fistNameFormatter, i, rowFormatter, store;
+    fistNameFormatter = function(tdEl, column, data) {
+      if (!(data.id % 10)) {
+        tdEl.css("background", "rgb(199, 255, 199)");
+      }
+      return tdEl.text(data.first_name);
+    };
+    rowFormatter = function(trEl, data) {
+      if (!(data.id % 20)) {
+        return trEl.addClass("error");
+      }
+    };
     columns = [
       {
         key: "id",
@@ -15,7 +26,7 @@
       }, {
         key: "first_name",
         label: "First Name",
-        formatter: null,
+        formatter: fistNameFormatter,
         sortable: true,
         hidden: false
       }, {
@@ -44,6 +55,7 @@
       columns: columns,
       fields: fields,
       store: store,
+      rowFormatter: rowFormatter,
       sortedBy: {
         key: "id",
         dir: "ASC"

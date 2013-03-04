@@ -104,9 +104,11 @@ class Ex.DataTable
    * Renders the view with existing records
   ###
   render: ->
-    storeData = @getStore().getData()
+    store = @getStore()
+    storeData = store.getData()
     columns = @get("columns")
     sortedBy = @get("sortedBy")
+    rowFormatter = @get("rowFormatter")
     
     # sort the data
     storeData.sort (a, b) ->
@@ -123,9 +125,16 @@ class Ex.DataTable
     @tbodyEl.empty()
     for record in storeData
       trEl = jQuery "<tr />"
+      rowFormatter?(trEl, record)
+      
       for column in columns
         tdEl = jQuery "<td />"
-        tdEl.append jQuery("<div />").text(record[column.key])
+        
+        # call cell formatter
+        if typeof column.formatter is "function"
+          column.formatter tdEl, column, record
+        else
+          tdEl.append jQuery("<div />").text(record[column.key])
         
         if column.hidden
           tdEl.addClass("hidden").css("display", "none")
