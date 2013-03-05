@@ -8,7 +8,7 @@
 
 
 (function() {
-  var _ref,
+  var _ref, _ref1,
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
@@ -73,8 +73,8 @@
 
 
     AttributeProvider.prototype.set = function(name, value) {
-      this.emit("" + name + "Change", value);
-      return this.cfg[name] = value;
+      this.cfg[name] = value;
+      return this.emit("" + name + "Change", value);
     };
 
     /*
@@ -104,12 +104,14 @@
 
     function DataTable(container, configs) {
       this.onEventSortColumn = __bind(this.onEventSortColumn, this);
+      this.render = __bind(this.render, this);
       var defaults, sortedBy;
       this.__init();
       defaults = {
         paginator: null,
         columns: [],
         store: null,
+        filters: [],
         sortedBy: {
           key: null,
           dir: "ASC"
@@ -127,7 +129,30 @@
       } else {
         this.render();
       }
+      this.initEvents();
     }
+
+    DataTable.prototype.initEvents = function() {
+      var filter, paginator, _i, _len, _ref1, _results;
+      if (paginator = this.get("paginator")) {
+        paginator.on("currentPageChange", this.render);
+        paginator.on("rowsPerPageChange", this.render);
+      }
+      this.getStore().on("onDataChange", function(data) {
+        if (paginator) {
+          return paginator.setTotalRecords(data.length);
+        } else {
+          return this.render();
+        }
+      });
+      _ref1 = this.get("filters");
+      _results = [];
+      for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
+        filter = _ref1[_i];
+        _results.push(filter.on("valueChange", this.render));
+      }
+      return _results;
+    };
 
     /*
      * Find column by attribute name and its value
@@ -154,6 +179,14 @@
     DataTable.prototype.getStore = function() {
       return this.get("store");
     };
+
+    /*getData: ->
+      @_data
+      
+    setData: (data) ->
+      @_data = data
+    */
+
 
     /*
      * Render the TH elements
@@ -188,45 +221,44 @@
 
 
     DataTable.prototype.render = function() {
-      var column, columns, record, rowFormatter, sortedBy, store, storeData, tdEl, trEl, _i, _j, _len, _len1, _results;
+      var column, columns, filter, filters, from, paginator, record, rowFormatter, sortedBy, store, storeData, tdEl, to, trEl, _i, _j, _k, _len, _len1, _len2,
+        _this = this;
+      console.time("Rendering data");
       store = this.getStore();
       storeData = store.getData();
       columns = this.get("columns");
       sortedBy = this.get("sortedBy");
       rowFormatter = this.get("rowFormatter");
-      storeData.sort(function(a, b) {
-        var asc, val1, val2;
-        asc = sortedBy.dir === "ASC";
-        val1 = a[sortedBy.key];
-        val2 = b[sortedBy.key];
-        if (val1 < val2) {
-          if (asc) {
-            return -1;
-          } else {
-            return 1;
-          }
+      paginator = this.get("paginator");
+      filters = this.get("filters");
+      for (_i = 0, _len = filters.length; _i < _len; _i++) {
+        filter = filters[_i];
+        if (filter.isSelected()) {
+          storeData = storeData.filter(function(element, index, array) {
+            return filter.filter(element, index, array);
+          });
         }
-        if (val1 === val2) {
-          return 0;
-        } else {
-          if (asc) {
-            return 1;
-          } else {
-            return -1;
-          }
-        }
-      });
+      }
+      if (paginator) {
+        paginator.setTotalRecords(storeData.length);
+      }
+      from = 0;
+      to = storeData.length;
+      if (paginator) {
+        from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage();
+        to = paginator.getCurrentPage() * paginator.getRowsPerPage();
+      }
+      storeData = storeData.slice(from, to);
       this.tbodyEl.empty();
-      _results = [];
-      for (_i = 0, _len = storeData.length; _i < _len; _i++) {
-        record = storeData[_i];
+      for (_j = 0, _len1 = storeData.length; _j < _len1; _j++) {
+        record = storeData[_j];
         trEl = jQuery("<tr />");
         if (typeof rowFormatter === "function") {
           rowFormatter(trEl, record);
         }
         trEl.addClass("ex-dt-" + (_i % 2 ? 'odd' : 'even'));
-        for (_j = 0, _len1 = columns.length; _j < _len1; _j++) {
-          column = columns[_j];
+        for (_k = 0, _len2 = columns.length; _k < _len2; _k++) {
+          column = columns[_k];
           tdEl = jQuery("<td />");
           if (typeof column.formatter === "function") {
             column.formatter(tdEl, column, record);
@@ -236,11 +268,18 @@
           if (column.hidden) {
             tdEl.addClass("hidden").css("display", "none");
           }
+          tdEl.on("click", function(event) {
+            return _this.onCellClick(event, column, record, _this);
+          });
           trEl.append(tdEl);
         }
-        _results.push(this.tbodyEl.append(trEl));
+        this.tbodyEl.append(trEl);
       }
-      return _results;
+      return console.timeEnd("Rendering data");
+    };
+
+    DataTable.prototype.onCellClick = function(event, column, record, dataTable) {
+      return console.log("onCellClickEvent", arguments);
     };
 
     /*
@@ -250,12 +289,10 @@
 
     DataTable.prototype.onEventSortColumn = function(column, event) {
       var dir;
-      console.time("Sorting");
       if (column.sortable) {
         dir = this.get("sortedBy").dir === "ASC" ? "DESC" : "ASC";
-        this.sortColumn(column, dir);
+        return this.sortColumn(column, dir);
       }
-      return console.timeEnd("Sorting");
     };
 
     /*
@@ -270,6 +307,7 @@
       });
       column.thEl.parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc");
       column.thEl.addClass("ex-dt-" + (dir.toLowerCase()));
+      this.getStore().sort(column.key, dir);
       return this.render();
     };
 
@@ -295,12 +333,15 @@
     }
 
     Store.prototype.setData = function(data) {
-      return this._data = jQuery.extend([], data);
+      this._data = jQuery.extend([], data);
+      return this.emit("onDataChange", this._data);
     };
 
     Store.prototype.getData = function() {
       return this._data;
     };
+
+    Store.prototype.sortData = function(key, dir) {};
 
     return Store;
 
@@ -319,6 +360,31 @@
       ArrayStore.__super__.constructor.apply(this, arguments);
     }
 
+    ArrayStore.prototype.sort = function(key, dir) {
+      return this.getData().sort(function(a, b) {
+        var asc, val1, val2;
+        asc = dir === "ASC";
+        val1 = a[key];
+        val2 = b[key];
+        if (val1 < val2) {
+          if (asc) {
+            return -1;
+          } else {
+            return 1;
+          }
+        }
+        if (val1 === val2) {
+          return 0;
+        } else {
+          if (asc) {
+            return 1;
+          } else {
+            return -1;
+          }
+        }
+      });
+    };
+
     return ArrayStore;
 
   })(Ex.Store);
@@ -334,27 +400,41 @@
 
     $.extend(Paginator.prototype, Ex.AttributeProvider.prototype);
 
-    Paginator.prototype._currentPage = 1;
-
     function Paginator(config) {
+      this._handlePageChange = __bind(this._handlePageChange, this);
       this.render = __bind(this.render, this);
+      this.updateVisibility = __bind(this.updateVisibility, this);
       var defaults;
       this.__init();
       defaults = {
         rowsPerPage: 30,
+        rowsPerPageSelect: null,
         containers: '',
-        totalRecords: 0
+        totalRecords: 0,
+        currentPage: 1,
+        alwaysVisible: false
       };
       config = $.extend(defaults, config);
       config.containers = $(config.containers);
       this.cfg = config;
-      config.containers.on("click", "li", this._handleStateChange);
       this._initUIComponents();
+      this.initEvents();
       this._selfSubscribe();
-      this.render();
+      this.setPage(1);
     }
 
-    Paginator.prototype.updateVisibility = function() {};
+    Paginator.prototype.updateVisibility = function() {
+      var containers, next, prev;
+      containers = this.get("containers");
+      prev = containers.find(".ex-pg-first, .ex-pg-prev");
+      next = containers.find(".ex-pg-last, .ex-pg-next");
+      if ((prev.hasClass("disabled") && this.hasPrevPage()) || !this.hasPrevPage()) {
+        prev.toggleClass("disabled");
+      }
+      if ((next.hasClass("disabled") && this.hasNextPage()) || !this.hasNextPage()) {
+        return next.toggleClass("disabled");
+      }
+    };
 
     /*
      * Render the pagination controls per the format attribute into the specified container nodes.
@@ -362,33 +442,83 @@
 
 
     Paginator.prototype.render = function() {
-      var containers, i, liEl, nextEl, rowsPerPage, totalPages, totalRecords, _results;
-      totalRecords = +this.get("totalRecords");
-      rowsPerPage = +this.get("rowsPerPage");
+      var containers, currentPage, from, i, liEl, nextEl, to, totalPages, totalRecords, _results;
+      totalRecords = this.getTotalRecords();
       containers = this.get("containers");
+      currentPage = this.getCurrentPage();
       containers.find(".ex-pg-page").remove();
       nextEl = containers.find(".ex-pg-next");
-      totalPages = totalRecords / rowsPerPage;
-      if (totalPages > Math.floor(totalPages)) {
-        totalPages++;
+      totalPages = this.getTotalPages();
+      to = currentPage + 4;
+      from = currentPage - 4;
+      if (from <= 0) {
+        to += Math.abs(from) + 1;
+        from = 1;
       }
-      i = this.getCurrentPage();
+      if (to > totalPages) {
+        from -= to - totalPages;
+        to = totalPages;
+      }
+      if (from <= 0) {
+        from = 1;
+      }
+      if (to > totalPages) {
+        to = totalPages;
+      }
+      i = from;
       _results = [];
-      while (i <= totalPages) {
+      while (i <= to) {
         liEl = jQuery("<li />", {
           "class": "ex-pg-page"
         }).append(jQuery("<a />", {
           href: "#",
           text: i
         }));
+        if (i === currentPage) {
+          liEl.addClass("active");
+        }
         liEl.insertBefore(nextEl);
+        liEl.data("page", i);
         _results.push(i++);
       }
       return _results;
     };
 
+    Paginator.prototype.getTotalRecords = function() {
+      return +this.get("totalRecords");
+    };
+
+    /*
+     * Set the total number of records.
+    */
+
+
+    Paginator.prototype.setTotalRecords = function(total) {
+      if (this.getTotalRecords() !== total) {
+        return this.set("totalRecords", total);
+      }
+    };
+
+    Paginator.prototype.getRowsPerPage = function() {
+      return this.get("rowsPerPage");
+    };
+
+    /*
+     * Set the number of rows per page.
+    */
+
+
+    Paginator.prototype.setRowsPerPage = function(number) {
+      return this.set("rowsPerPage", number);
+    };
+
+    /*
+     * Get the page number corresponding to the current record offset.
+    */
+
+
     Paginator.prototype.getCurrentPage = function() {
-      return this._currentPage;
+      return this.get("currentPage");
     };
 
     /*
@@ -399,7 +529,48 @@
 
 
     Paginator.prototype.setPage = function(newPage) {
-      return this._currentPage = newPage;
+      if (this.hasPage(newPage)) {
+        return this.set("currentPage", newPage);
+      }
+    };
+
+    Paginator.prototype.getTotalPages = function() {
+      var totalPages;
+      totalPages = this.getTotalRecords() / this.getRowsPerPage();
+      if (totalPages > Math.floor(totalPages)) {
+        totalPages++;
+      }
+      return Math.floor(totalPages);
+    };
+
+    /*
+     * Does the requested page have any records?
+    */
+
+
+    Paginator.prototype.hasPage = function(page) {
+      if (page < 1) {
+        return false;
+      }
+      return page <= this.getTotalPages();
+    };
+
+    /*
+     * Are there records on the next page?
+    */
+
+
+    Paginator.prototype.hasNextPage = function() {
+      return this.hasPage(this.getCurrentPage() + 1);
+    };
+
+    /*
+     * Is there a page before the current page?
+    */
+
+
+    Paginator.prototype.hasPrevPage = function() {
+      return this.hasPage(this.getCurrentPage() - 1);
     };
 
     /*
@@ -407,7 +578,57 @@
     */
 
 
-    Paginator.prototype._handleStateChange = function(event) {};
+    Paginator.prototype._handleStateChange = function() {
+      var totalPages;
+      totalPages = this.getTotalPages();
+      if (totalPages <= 1) {
+        if (!this.get("alwaysVisible")) {
+          this.get("containers").hide("fast");
+        }
+      } else if (!this.get("alwaysVisible")) {
+        this.get("containers").show("fast");
+      }
+      if (this.getCurrentPage() > totalPages) {
+        this.setPage(totalPages);
+      }
+      this.render();
+      return this.updateVisibility();
+    };
+
+    /*
+     *  Fires the pageChange event when the state attributes have changed
+    */
+
+
+    Paginator.prototype._handlePageChange = function(event) {
+      var currentPage, page, target, totalPages;
+      target = $(event.currentTarget);
+      currentPage = this.getCurrentPage();
+      totalPages = this.getTotalPages();
+      page = target.data("page");
+      if (page === "prev") {
+        page = currentPage - 1;
+      } else if (page === "next") {
+        page = currentPage + 1;
+      } else if (page === "last") {
+        page = totalPages;
+      }
+      if (page !== currentPage) {
+        return this.setPage(+page);
+      }
+    };
+
+    Paginator.prototype.initEvents = function() {
+      var select,
+        _this = this;
+      this.get("containers").on("click", "li", this._handlePageChange);
+      if (select = this.get("rowsPerPageSelect")) {
+        select = jQuery(select);
+        return select.on("change", function(event) {
+          return _this.set("rowsPerPage", select.val());
+        });
+      }
+    };
 
     /*
      * Subscribes to instance attribute change events to automate certain behaviors.
@@ -415,7 +636,10 @@
 
 
     Paginator.prototype._selfSubscribe = function() {
-      return this.on("totalRecordsChange", this.render);
+      this.on("rowsPerPageChange", this._handleStateChange);
+      this.on("totalRecordsChange", this._handleStateChange);
+      this.on("currentPageChange", this.render);
+      return this.on("currentPageChange", this.updateVisibility);
     };
 
     Paginator.prototype._initUIComponents = function() {
@@ -428,27 +652,116 @@
       }).append(jQuery("<a />", {
         href: "#",
         text: "First"
-      })), jQuery("<li />", {
+      })).data("page", 1), jQuery("<li />", {
         "class": "ex-pg-prev"
       }).append(jQuery("<a />", {
         href: "#",
         text: "Prev"
-      })), jQuery("<li />", {
+      })).data("page", "prev"), jQuery("<li />", {
         "class": "ex-pg-next"
       }).append(jQuery("<a />", {
         href: "#",
         text: "Next"
-      })), jQuery("<li />", {
+      })).data("page", "next"), jQuery("<li />", {
         "class": "ex-pg-last"
       }).append(jQuery("<a />", {
         href: "#",
         text: "Last"
-      })));
+      })).data("page", "last"));
       return this.get("containers").empty().append(ulEl);
     };
 
     return Paginator;
 
   })();
+
+  Ex.Filter = (function() {
+
+    $.extend(Filter.prototype, Ex.AttributeProvider.prototype);
+
+    function Filter(config) {
+      this.__init();
+    }
+
+    Filter.prototype.filter = function(element, index, array) {};
+
+    Filter.prototype.isSelected = function() {};
+
+    return Filter;
+
+  })();
+
+  Ex.Filter.Search = (function(_super) {
+
+    __extends(Search, _super);
+
+    function Search(config) {
+      this._applyFilters = __bind(this._applyFilters, this);
+      var defaults;
+      Search.__super__.constructor.apply(this, arguments);
+      defaults = {
+        container: null,
+        filterFn: this._applyFilters,
+        valueUpdate: 'keydown',
+        value: ''
+      };
+      this.cfg = $.extend(defaults, config);
+      this.cfg.container = jQuery(this.cfg.container);
+      this.initEvents();
+    }
+
+    Search.prototype.initEvents = function() {
+      var event,
+        _this = this;
+      event = this.get("valueUpdate");
+      return this.get("container").on(event, Ex.util.throttle(function(event) {
+        return _this.set("value", jQuery(event.target).val());
+      }, 100));
+    };
+
+    Search.prototype.filter = function(element, index, array) {
+      var _base;
+      return typeof (_base = this.get("filterFn")) === "function" ? _base(element, index, array) : void 0;
+    };
+
+    Search.prototype.isSelected = function() {
+      return !!this.get("value");
+    };
+
+    Search.prototype._applyFilters = function(element, index, array) {
+      var name, predicate, record, value;
+      value = this.get("value").toLowerCase();
+      predicate = false;
+      for (name in element) {
+        record = element[name];
+        if (~((record + "").toLowerCase().indexOf(value))) {
+          predicate = true;
+          break;
+        }
+      }
+      return predicate;
+    };
+
+    return Search;
+
+  })(Ex.Filter);
+
+  if ((_ref1 = Ex.util) == null) {
+    Ex.util = {};
+  }
+
+  Ex.util.throttle = function(fn, delay) {
+    var timer;
+    timer = null;
+    return function() {
+      var args, context;
+      context = this;
+      args = arguments;
+      clearTimeout(timer);
+      return timer = setTimeout(function() {
+        return fn.apply(context, args);
+      }, delay);
+    };
+  };
 
 }).call(this);

@@ -60,6 +60,11 @@ $ ->
     paginator: new Ex.Paginator
       containers: '.pagination'
       totalRecords: 200
+      rowsPerPage: 10
+      rowsPerPageSelect: "#rows-per-page"
+    filters: [
+      new Ex.Filter.Search container: "#search"
+    ]
     sortedBy:
       key: "id"
       dir: "ASC"
