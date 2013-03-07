@@ -4,12 +4,12 @@ $ ->
   
   fistNameFormatter = (tdEl, column, data) ->
     unless data.id % 10
-      tdEl.css("background", "rgb(199, 255, 199)")
-    tdEl.text(data.first_name)
+      $(tdEl).css("background", "rgb(199, 255, 199)")
+    $(tdEl).text(data.first_name)
   
   
   rowFormatter = (trEl, data) ->
-    trEl.addClass("error") unless data.id % 20
+    $(trEl).addClass("error") unless data.id % 20
     
   
   columns = [
@@ -17,6 +17,7 @@ $ ->
     label: "#"
     sortable: false
     hidden: false
+    width: 20
   ,
     key: "hidden"
     label: "Hidden"
@@ -58,7 +59,7 @@ $ ->
     store: store
     rowFormatter: rowFormatter
     paginator: new Ex.Paginator
-      containers: '.pagination'
+      container: '.pagination'
       totalRecords: 200
       rowsPerPage: 10
       rowsPerPageSelect: "#rows-per-page"

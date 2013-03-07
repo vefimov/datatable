@@ -8,13 +8,13 @@
     var columns, data, fistNameFormatter, i, rowFormatter, store;
     fistNameFormatter = function(tdEl, column, data) {
       if (!(data.id % 10)) {
-        tdEl.css("background", "rgb(199, 255, 199)");
+        $(tdEl).css("background", "rgb(199, 255, 199)");
       }
-      return tdEl.text(data.first_name);
+      return $(tdEl).text(data.first_name);
     };
     rowFormatter = function(trEl, data) {
       if (!(data.id % 20)) {
-        return trEl.addClass("error");
+        return $(trEl).addClass("error");
       }
     };
     columns = [
@@ -22,7 +22,8 @@
         key: "id",
         label: "#",
         sortable: false,
-        hidden: false
+        hidden: false,
+        width: 20
       }, {
         key: "hidden",
         label: "Hidden",
@@ -61,7 +62,7 @@
       store: store,
       rowFormatter: rowFormatter,
       paginator: new Ex.Paginator({
-        containers: '.pagination',
+        container: '.pagination',
         totalRecords: 200,
         rowsPerPage: 10,
         rowsPerPageSelect: "#rows-per-page"

@@ -77,20 +77,14 @@ class Ex.DataTable
             key: null,
             dir: "ASC"
       
-        @container = jQuery container
+        @container = jQuery(container).empty().get(0)
         @cfg = $.extend(defaults, configs)
-        
-      
-        @theadEl = jQuery "<thead />"
-        @tbodyEl = jQuery "<tbody />"
-        @container.empty().append(@theadEl).append(@tbodyEl)
-        
+                
         @renderColumns()
-      
-      
+        
         sortedBy = @get("sortedBy")
         if sortedBy.key
-          @sortColumn(@getColumn("key", sortedBy.key), sortedBy.dir)
+            @sortColumn(@getColumn("key", sortedBy.key), sortedBy.dir)
         else
           @render()
         
@@ -104,12 +98,43 @@ class Ex.DataTable
         @getStore().on "onDataChange", (data) ->
             if paginator
                 paginator.setTotalRecords data.length
-            else
-                @render()
+            
+            @render()
 
         for filter in @get("filters")
             filter.on "valueChange", @render
-                
+            
+        jQuery(@container).on "click", "thead th", @onThClick
+        jQuery(@container).on "click", "tbody tr", @onRowClick
+        jQuery(@container).on "click", "tbody td", @onCellClick    
+    
+    
+    onCellClick: (event) =>
+        tdEl = event.currentTarget
+        @emit "onCellClick",
+            event: event
+            column: tdEl.exData.column
+            record: tdEl.exData.record
+        
+    onRowClick: (event) =>
+        trEl = event.currentTarget
+        @emit "onRowClick",
+            event: event
+            column: trEl.exData.column
+            record: trEl.exData.record
+        
+    onThClick: (event) =>
+        thEl = event.currentTarget
+        column = thEl.exData.column
+        
+        @emit "onThClick",
+            event: event
+            column: column
+        
+        if column.sortable
+           dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
+           # Update UI via sortedBy
+           @sortColumn column, dir
     
     ###
      * Find column by attribute name and its value
@@ -136,32 +161,47 @@ class Ex.DataTable
      * Render the TH elements
     ###
     renderColumns: ->
-      theadRowEl = jQuery "<tr />"
-      columns = @get("columns")
-    
-      for column in columns
-        thEl = jQuery "<th />"
+        #@theadEl = @container.createTHead()
+        #@tbodyEl = @container.createTBody()
         
-        # add css classes to th element
-        thEl.addClass("ex-dt-sortable") if column.sortable
-        thEl.addClass("ex-dt-hidden").css("display", "none") if column.hidden
-        thEl.addClass("ex-dt-col-#{column.key}")
-        
-        thEl.append jQuery("<div />").text(column.label)
-        thEl.on "click", @onEventSortColumn.bind null, column
-          
-        column.thEl = thEl
-        theadRowEl.append thEl
-    
-      @theadEl.append theadRowEl
+        @theadEl = @container.appendChild @container.createTHead()
+        @tbodyEl = @container.appendChild @container.createTBody()
+            
+        theadRowEl = @theadEl.insertRow 0
+        columns = @get("columns")
+      
+        for column in columns
+            thEl = theadRowEl.appendChild document.createElement("th")
+            thEl.exData = column: column
+            thEl.width = column.width if column.width
+            
+            classes = ["ex-dt-col-#{column.key}"]
+            # add css classes to th element
+            classes.push("ex-dt-sortable") if column.sortable
+            if column.hidden
+                classes.push("ex-dt-hidden")
+                thEl.style.display = "none" 
+            classes.push("ex-dt-col-#{column.key}")
+            
+            thEl.className = classes.join " "
+            divEl = document.createElement("div")
+            divEl.className = "ex-dt-cell-inner"
+            divEl.appendChild document.createTextNode column.label
+            thEl.appendChild divEl
+            #thEl.on "click", @onEventSortColumn.bind null, column
+              
+            column.thEl = thEl
+            theadRowEl.appendChild thEl
+      
+        @theadEl.appendChild theadRowEl
     
     ###
      * Renders the view with existing records
     ###
     render: =>
         console.time("Rendering data")
-        store = @getStore()
-        storeData = store.getData()
+        #tore = @getStore()
+        storeData = @getStore().getData()
         columns = @get("columns")
         sortedBy = @get("sortedBy")
         rowFormatter = @get("rowFormatter")
@@ -177,16 +217,50 @@ class Ex.DataTable
         paginator.setTotalRecords(storeData.length) if paginator
         
         from = 0
-        to = storeData.length
+        to = 10 #storeData.length
         
         if paginator
-            from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage()
-            to = paginator.getCurrentPage() * paginator.getRowsPerPage()
+             from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage()
+             to = paginator.getCurrentPage() * paginator.getRowsPerPage()
+         
+         storeData = storeData.slice from, to
+         
+         #@tbodyEl.empty()
+         
+         #tbodyEl = @tbodyEl
+         @tbodyEl.innerHTML = ''
+         
+         for record in storeData
+             trEl = @tbodyEl.insertRow _j
+             trEl.exData = record:record
+             rowFormatter?(trEl, record)
+             trEl.className = "ex-dt-#{if _i % 2 then 'odd' else 'even'}"
+             
+             for column in columns
+                 tdEl = trEl.insertCell _k
+                 tdEl.exData =
+                     column: column
+                     record: record
+                 tdEl.className = "ex-dt-col-#{column.key}"
+                 
+                 # call cell formatter
+                 if typeof column.formatter is "function"
+                   column.formatter tdEl, column, record
+                 else
+                     divEl = document.createElement "div"
+                     divEl.className = "ex-dt-cell-inner"
+                     divEl.appendChild document.createTextNode(record[column.key])
+                     tdEl.appendChild divEl
+                 
+                 if column.hidden
+                     tdEl.className += " hidden"
+                     tdEl.style.display = "none"
+                     
+                 
+                 
+             @tbodyEl.appendChild trEl
         
-        storeData = storeData.slice from, to
-        
-        @tbodyEl.empty()
-        for record in storeData
+        ###for record in storeData
           trEl = jQuery "<tr />"
           #yui-dt-even
           rowFormatter?(trEl, record)
@@ -208,31 +282,47 @@ class Ex.DataTable
                 @onCellClick(event, column, record, @)
             
             trEl.append tdEl
-          @tbodyEl.append trEl
+          @tbodyEl.append trEl###
           
         console.timeEnd("Rendering data")
-          
-    onCellClick: (event, column, record, dataTable)->
-        console.log "onCellClickEvent", arguments
     
     ###
      * Custom event handler to sort Column.
     ###
-    onEventSortColumn: (column, event) =>
+    ###onEventSortColumn: (column) =>
       if column.sortable
         dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
         # Update UI via sortedBy
-        @sortColumn column, dir
+        @sortColumn column, dir###
     
     ###
      * Sorts given Column. 
     ###
     sortColumn: (column, dir) ->
-      @set("sortedBy", key: column.key, dir: dir)
-      column.thEl.parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc")
-      column.thEl.addClass "ex-dt-#{dir.toLowerCase()}"
-      @getStore().sort column.key, dir
-      @render()
+        @set("sortedBy", key: column.key, dir: dir)
+        $(column.thEl).addClass("ex-dt-#{dir.toLowerCase()}")
+          .parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc")
+        
+        @getStore().sort column.key, dir
+        #@render()
+      
+    
+    showColumn: (column) ->
+        jQuery(".ex-dt-col-#{column.key}").show()
+        
+    hideColumn: (column) ->
+        jQuery(".ex-dt-col-#{column.key}").hide()
+        
+    
+    ###getColumnByKey: (key) ->
+        for column in @get("columns")
+            if column.key is key
+                return column###
+
+
+###class Ex.DataTable.Column
+    $.extend @prototype, Ex.AttributeProvider.prototype
+    constructor: ->###
 
 
 ###
@@ -255,7 +345,7 @@ class Ex.Store
     getData: ->
       @_data
       
-    sortData: (key, dir) ->
+    #sortData: (key, dir) ->
       
 
 ###
@@ -277,6 +367,32 @@ class Ex.ArrayStore extends Ex.Store
             return 0
           else
             return if asc then 1 else -1
+        
+        @emit "onDataChange", @getData()
+        
+###
+ * 
+###
+class Ex.TableStore extends Ex.ArrayStore
+    constructor: (configs) ->
+        #config.fields  
+        #
+        fields = config.fields
+        data = []
+        jQuery("tbody tr", configs.container).each (key, rowEl) ->
+            cells = $(rowEl).find(">td")
+            for field in fields
+                obj = {}
+                obj[field] = cells.eq(_i).text()
+                data.push obj
+        configs =
+            data : data
+        super config
+        
+        
+class Ex.RemoteStore extends Ex.ArrayStore
+    constructor: (configs) ->
+        super config
 
 ###
  * Paginator 
@@ -288,18 +404,18 @@ class Ex.Paginator
     
     #_currentPage: 1
     
-    constructor: (config) ->
+    constructor: (@config) ->
       @__init()
       defaults =
         rowsPerPage: 30
         rowsPerPageSelect: null 
-        containers: ''
+        container: ''
         totalRecords: 0
         currentPage: 1
         alwaysVisible: false
       
       config = $.extend(defaults, config)
-      config.containers = $(config.containers)
+      config.container = $(config.container).eq(0)
       #config.rowsPerPageSelect = $(config.containers)
       @cfg = config
       
@@ -310,9 +426,9 @@ class Ex.Paginator
       @setPage 1
       
     updateVisibility: =>
-      containers = @get("containers")
-      prev = containers.find(".ex-pg-first, .ex-pg-prev")
-      next = containers.find(".ex-pg-last, .ex-pg-next")
+      container = @get("container")
+      prev = container.find(".ex-pg-first, .ex-pg-prev")
+      next = container.find(".ex-pg-last, .ex-pg-next")
       
       if (prev.hasClass("disabled") && @hasPrevPage()) || !@hasPrevPage()
           prev.toggleClass("disabled")
@@ -325,13 +441,14 @@ class Ex.Paginator
     render: =>
         totalRecords = @getTotalRecords()
         #rowsPerPage = +@get("rowsPerPage")
-        containers = @get("containers")
+        container = @get("container")
         currentPage = @getCurrentPage()
       
         
-        containers.find(".ex-pg-page").remove()
-        nextEl = containers.find(".ex-pg-next")
-        
+        container.find(".ex-pg-page").remove()
+        nextEl = container.find(".ex-pg-next").get(0)
+        ulEl = container.find(">ul").get(0)
+
         totalPages = @getTotalPages()
         
         # conditions to align active page by center
@@ -347,18 +464,33 @@ class Ex.Paginator
       
         from = 1 if from <= 0
         to = totalPages if to > totalPages
-       
+
         i = from
         while i <= to
-          liEl = jQuery("<li />", class: "ex-pg-page").append(
-            jQuery("<a />", href: "#", text: i)
-          )
+            liEl = document.createElement "li"
+            liEl.className = "ex-pg-page"
+            
+            linkEl = document.createElement "a"
+            linkEl.href = "#"
+            linkEl.textContent = i
+            
+            liEl.className += " active" if i is currentPage
+            liEl.setAttribute "data-page", i
+            liEl.appendChild linkEl
+            
+            #console.log ulEl
+            #ulEl.appendChild liEl
+            ulEl.insertBefore(liEl, nextEl)
+           
+            ###liEl = jQuery("<li />", class: "ex-pg-page").append(
+              jQuery("<a />", href: "#", text: i)
+            )
+            
+            liEl.addClass("active") if i is currentPage
+            liEl.insertBefore(nextEl)
+            liEl.data("page", i)###
           
-          liEl.addClass("active") if i is currentPage
-          liEl.insertBefore(nextEl)
-          liEl.data("page", i)
-          
-          i++
+            i++
          
     getTotalRecords: ->
       return +@get("totalRecords")
@@ -426,9 +558,9 @@ class Ex.Paginator
         totalPages = @getTotalPages()
         
         if totalPages <= 1           
-            @get("containers").hide("fast") unless @get("alwaysVisible")
+            @get("container").hide("fast") unless @get("alwaysVisible")
         else unless @get("alwaysVisible")
-            @get("containers").show("fast") 
+            @get("container").show("fast") 
         
         if @getCurrentPage() > totalPages
             @setPage totalPages
@@ -457,7 +589,7 @@ class Ex.Paginator
       @setPage +page unless page is currentPage
       
     initEvents: ->
-        @get("containers").on "click", "li", @_handlePageChange
+        @get("container").on "click", "li", @_handlePageChange
         
         if select = @get("rowsPerPageSelect")
             select = jQuery select
@@ -487,7 +619,7 @@ class Ex.Paginator
         jQuery("<li />", class: "ex-pg-last").append(jQuery("<a />", href: "#", text: "Last")).data("page", "last")
       )
       
-      @get("containers").empty().append(ulEl)
+      @get("container").empty().append(ulEl)
       
   
   

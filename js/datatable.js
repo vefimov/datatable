@@ -103,8 +103,10 @@
     $.extend(DataTable.prototype, Ex.AttributeProvider.prototype);
 
     function DataTable(container, configs) {
-      this.onEventSortColumn = __bind(this.onEventSortColumn, this);
       this.render = __bind(this.render, this);
+      this.onThClick = __bind(this.onThClick, this);
+      this.onRowClick = __bind(this.onRowClick, this);
+      this.onCellClick = __bind(this.onCellClick, this);
       var defaults, sortedBy;
       this.__init();
       defaults = {
@@ -117,11 +119,8 @@
           dir: "ASC"
         }
       };
-      this.container = jQuery(container);
+      this.container = jQuery(container).empty().get(0);
       this.cfg = $.extend(defaults, configs);
-      this.theadEl = jQuery("<thead />");
-      this.tbodyEl = jQuery("<tbody />");
-      this.container.empty().append(this.theadEl).append(this.tbodyEl);
       this.renderColumns();
       sortedBy = this.get("sortedBy");
       if (sortedBy.key) {
@@ -133,25 +132,59 @@
     }
 
     DataTable.prototype.initEvents = function() {
-      var filter, paginator, _i, _len, _ref1, _results;
+      var filter, paginator, _i, _len, _ref1;
       if (paginator = this.get("paginator")) {
         paginator.on("currentPageChange", this.render);
         paginator.on("rowsPerPageChange", this.render);
       }
       this.getStore().on("onDataChange", function(data) {
         if (paginator) {
-          return paginator.setTotalRecords(data.length);
-        } else {
-          return this.render();
+          paginator.setTotalRecords(data.length);
         }
+        return this.render();
       });
       _ref1 = this.get("filters");
-      _results = [];
       for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
         filter = _ref1[_i];
-        _results.push(filter.on("valueChange", this.render));
+        filter.on("valueChange", this.render);
       }
-      return _results;
+      jQuery(this.container).on("click", "thead th", this.onThClick);
+      jQuery(this.container).on("click", "tbody tr", this.onRowClick);
+      return jQuery(this.container).on("click", "tbody td", this.onCellClick);
+    };
+
+    DataTable.prototype.onCellClick = function(event) {
+      var tdEl;
+      tdEl = event.currentTarget;
+      return this.emit("onCellClick", {
+        event: event,
+        column: tdEl.exData.column,
+        record: tdEl.exData.record
+      });
+    };
+
+    DataTable.prototype.onRowClick = function(event) {
+      var trEl;
+      trEl = event.currentTarget;
+      return this.emit("onRowClick", {
+        event: event,
+        column: trEl.exData.column,
+        record: trEl.exData.record
+      });
+    };
+
+    DataTable.prototype.onThClick = function(event) {
+      var column, dir, thEl;
+      thEl = event.currentTarget;
+      column = thEl.exData.column;
+      this.emit("onThClick", {
+        event: event,
+        column: column
+      });
+      if (column.sortable) {
+        dir = this.get("sortedBy").dir === "ASC" ? "DESC" : "ASC";
+        return this.sortColumn(column, dir);
+      }
     };
 
     /*
@@ -194,25 +227,38 @@
 
 
     DataTable.prototype.renderColumns = function() {
-      var column, columns, thEl, theadRowEl, _i, _len;
-      theadRowEl = jQuery("<tr />");
+      var classes, column, columns, divEl, thEl, theadRowEl, _i, _len;
+      this.theadEl = this.container.appendChild(this.container.createTHead());
+      this.tbodyEl = this.container.appendChild(this.container.createTBody());
+      theadRowEl = this.theadEl.insertRow(0);
       columns = this.get("columns");
       for (_i = 0, _len = columns.length; _i < _len; _i++) {
         column = columns[_i];
-        thEl = jQuery("<th />");
+        thEl = theadRowEl.appendChild(document.createElement("th"));
+        thEl.exData = {
+          column: column
+        };
+        if (column.width) {
+          thEl.width = column.width;
+        }
+        classes = ["ex-dt-col-" + column.key];
         if (column.sortable) {
-          thEl.addClass("ex-dt-sortable");
+          classes.push("ex-dt-sortable");
         }
         if (column.hidden) {
-          thEl.addClass("ex-dt-hidden").css("display", "none");
+          classes.push("ex-dt-hidden");
+          thEl.style.display = "none";
         }
-        thEl.addClass("ex-dt-col-" + column.key);
-        thEl.append(jQuery("<div />").text(column.label));
-        thEl.on("click", this.onEventSortColumn.bind(null, column));
+        classes.push("ex-dt-col-" + column.key);
+        thEl.className = classes.join(" ");
+        divEl = document.createElement("div");
+        divEl.className = "ex-dt-cell-inner";
+        divEl.appendChild(document.createTextNode(column.label));
+        thEl.appendChild(divEl);
         column.thEl = thEl;
-        theadRowEl.append(thEl);
+        theadRowEl.appendChild(thEl);
       }
-      return this.theadEl.append(theadRowEl);
+      return this.theadEl.appendChild(theadRowEl);
     };
 
     /*
@@ -221,11 +267,9 @@
 
 
     DataTable.prototype.render = function() {
-      var column, columns, filter, filters, from, paginator, record, rowFormatter, sortedBy, store, storeData, tdEl, to, trEl, _i, _j, _k, _len, _len1, _len2,
-        _this = this;
+      var column, columns, divEl, filter, filters, from, paginator, record, rowFormatter, sortedBy, storeData, tdEl, to, trEl, _i, _j, _k, _len, _len1, _len2;
       console.time("Rendering data");
-      store = this.getStore();
-      storeData = store.getData();
+      storeData = this.getStore().getData();
       columns = this.get("columns");
       sortedBy = this.get("sortedBy");
       rowFormatter = this.get("rowFormatter");
@@ -243,43 +287,72 @@
         paginator.setTotalRecords(storeData.length);
       }
       from = 0;
-      to = storeData.length;
+      to = 10;
       if (paginator) {
         from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage();
         to = paginator.getCurrentPage() * paginator.getRowsPerPage();
       }
       storeData = storeData.slice(from, to);
-      this.tbodyEl.empty();
+      this.tbodyEl.innerHTML = '';
       for (_j = 0, _len1 = storeData.length; _j < _len1; _j++) {
         record = storeData[_j];
-        trEl = jQuery("<tr />");
+        trEl = this.tbodyEl.insertRow(_j);
+        trEl.exData = {
+          record: record
+        };
         if (typeof rowFormatter === "function") {
           rowFormatter(trEl, record);
         }
-        trEl.addClass("ex-dt-" + (_i % 2 ? 'odd' : 'even'));
+        trEl.className = "ex-dt-" + (_i % 2 ? 'odd' : 'even');
         for (_k = 0, _len2 = columns.length; _k < _len2; _k++) {
           column = columns[_k];
-          tdEl = jQuery("<td />");
+          tdEl = trEl.insertCell(_k);
+          tdEl.exData = {
+            column: column,
+            record: record
+          };
+          tdEl.className = "ex-dt-col-" + column.key;
           if (typeof column.formatter === "function") {
             column.formatter(tdEl, column, record);
           } else {
-            tdEl.append(jQuery("<div />").text(record[column.key]));
+            divEl = document.createElement("div");
+            divEl.className = "ex-dt-cell-inner";
+            divEl.appendChild(document.createTextNode(record[column.key]));
+            tdEl.appendChild(divEl);
           }
           if (column.hidden) {
-            tdEl.addClass("hidden").css("display", "none");
+            tdEl.className += " hidden";
+            tdEl.style.display = "none";
           }
-          tdEl.on("click", function(event) {
-            return _this.onCellClick(event, column, record, _this);
-          });
-          trEl.append(tdEl);
         }
-        this.tbodyEl.append(trEl);
+        this.tbodyEl.appendChild(trEl);
       }
-      return console.timeEnd("Rendering data");
-    };
+      /*for record in storeData
+        trEl = jQuery "<tr />"
+        #yui-dt-even
+        rowFormatter?(trEl, record)
+        trEl.addClass "ex-dt-#{if _i % 2 then 'odd' else 'even'}"
+        
+        for column in columns
+          tdEl = jQuery "<td />"
+          
+          # call cell formatter
+          if typeof column.formatter is "function"
+            column.formatter tdEl, column, record
+          else
+            tdEl.append jQuery("<div />").text(record[column.key])
+          
+          if column.hidden
+            tdEl.addClass("hidden").css("display", "none")
+          
+          tdEl.on "click", (event) =>
+              @onCellClick(event, column, record, @)
+          
+          trEl.append tdEl
+        @tbodyEl.append trEl
+      */
 
-    DataTable.prototype.onCellClick = function(event, column, record, dataTable) {
-      return console.log("onCellClickEvent", arguments);
+      return console.timeEnd("Rendering data");
     };
 
     /*
@@ -287,13 +360,13 @@
     */
 
 
-    DataTable.prototype.onEventSortColumn = function(column, event) {
-      var dir;
-      if (column.sortable) {
-        dir = this.get("sortedBy").dir === "ASC" ? "DESC" : "ASC";
-        return this.sortColumn(column, dir);
-      }
-    };
+    /*onEventSortColumn: (column) =>
+      if column.sortable
+        dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
+        # Update UI via sortedBy
+        @sortColumn column, dir
+    */
+
 
     /*
      * Sorts given Column.
@@ -305,15 +378,34 @@
         key: column.key,
         dir: dir
       });
-      column.thEl.parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc");
-      column.thEl.addClass("ex-dt-" + (dir.toLowerCase()));
-      this.getStore().sort(column.key, dir);
-      return this.render();
+      $(column.thEl).addClass("ex-dt-" + (dir.toLowerCase())).parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc");
+      return this.getStore().sort(column.key, dir);
     };
+
+    DataTable.prototype.showColumn = function(column) {
+      return jQuery(".ex-dt-col-" + column.key).show();
+    };
+
+    DataTable.prototype.hideColumn = function(column) {
+      return jQuery(".ex-dt-col-" + column.key).hide();
+    };
+
+    /*getColumnByKey: (key) ->
+        for column in @get("columns")
+            if column.key is key
+                return column
+    */
+
 
     return DataTable;
 
   })();
+
+  /*class Ex.DataTable.Column
+      $.extend @prototype, Ex.AttributeProvider.prototype
+      constructor: ->
+  */
+
 
   /*
    * The Store class encapsulates a client side cache of Model objects
@@ -341,8 +433,6 @@
       return this._data;
     };
 
-    Store.prototype.sortData = function(key, dir) {};
-
     return Store;
 
   })();
@@ -361,7 +451,7 @@
     }
 
     ArrayStore.prototype.sort = function(key, dir) {
-      return this.getData().sort(function(a, b) {
+      this.getData().sort(function(a, b) {
         var asc, val1, val2;
         asc = dir === "ASC";
         val1 = a[key];
@@ -383,11 +473,59 @@
           }
         }
       });
+      return this.emit("onDataChange", this.getData());
     };
 
     return ArrayStore;
 
   })(Ex.Store);
+
+  /*
+   *
+  */
+
+
+  Ex.TableStore = (function(_super) {
+
+    __extends(TableStore, _super);
+
+    function TableStore(configs) {
+      var data, fields;
+      fields = config.fields;
+      data = [];
+      jQuery("tbody tr", configs.container).each(function(key, rowEl) {
+        var cells, field, obj, _i, _len, _results;
+        cells = $(rowEl).find(">td");
+        _results = [];
+        for (_i = 0, _len = fields.length; _i < _len; _i++) {
+          field = fields[_i];
+          obj = {};
+          obj[field] = cells.eq(_i).text();
+          _results.push(data.push(obj));
+        }
+        return _results;
+      });
+      configs = {
+        data: data
+      };
+      TableStore.__super__.constructor.call(this, config);
+    }
+
+    return TableStore;
+
+  })(Ex.ArrayStore);
+
+  Ex.RemoteStore = (function(_super) {
+
+    __extends(RemoteStore, _super);
+
+    function RemoteStore(configs) {
+      RemoteStore.__super__.constructor.call(this, config);
+    }
+
+    return RemoteStore;
+
+  })(Ex.ArrayStore);
 
   /*
    * Paginator 
@@ -401,21 +539,22 @@
     $.extend(Paginator.prototype, Ex.AttributeProvider.prototype);
 
     function Paginator(config) {
+      var defaults;
+      this.config = config;
       this._handlePageChange = __bind(this._handlePageChange, this);
       this.render = __bind(this.render, this);
       this.updateVisibility = __bind(this.updateVisibility, this);
-      var defaults;
       this.__init();
       defaults = {
         rowsPerPage: 30,
         rowsPerPageSelect: null,
-        containers: '',
+        container: '',
         totalRecords: 0,
         currentPage: 1,
         alwaysVisible: false
       };
       config = $.extend(defaults, config);
-      config.containers = $(config.containers);
+      config.container = $(config.container).eq(0);
       this.cfg = config;
       this._initUIComponents();
       this.initEvents();
@@ -424,10 +563,10 @@
     }
 
     Paginator.prototype.updateVisibility = function() {
-      var containers, next, prev;
-      containers = this.get("containers");
-      prev = containers.find(".ex-pg-first, .ex-pg-prev");
-      next = containers.find(".ex-pg-last, .ex-pg-next");
+      var container, next, prev;
+      container = this.get("container");
+      prev = container.find(".ex-pg-first, .ex-pg-prev");
+      next = container.find(".ex-pg-last, .ex-pg-next");
       if ((prev.hasClass("disabled") && this.hasPrevPage()) || !this.hasPrevPage()) {
         prev.toggleClass("disabled");
       }
@@ -442,12 +581,13 @@
 
 
     Paginator.prototype.render = function() {
-      var containers, currentPage, from, i, liEl, nextEl, to, totalPages, totalRecords, _results;
+      var container, currentPage, from, i, liEl, linkEl, nextEl, to, totalPages, totalRecords, ulEl, _results;
       totalRecords = this.getTotalRecords();
-      containers = this.get("containers");
+      container = this.get("container");
       currentPage = this.getCurrentPage();
-      containers.find(".ex-pg-page").remove();
-      nextEl = containers.find(".ex-pg-next");
+      container.find(".ex-pg-page").remove();
+      nextEl = container.find(".ex-pg-next").get(0);
+      ulEl = container.find(">ul").get(0);
       totalPages = this.getTotalPages();
       to = currentPage + 4;
       from = currentPage - 4;
@@ -468,17 +608,26 @@
       i = from;
       _results = [];
       while (i <= to) {
-        liEl = jQuery("<li />", {
-          "class": "ex-pg-page"
-        }).append(jQuery("<a />", {
-          href: "#",
-          text: i
-        }));
+        liEl = document.createElement("li");
+        liEl.className = "ex-pg-page";
+        linkEl = document.createElement("a");
+        linkEl.href = "#";
+        linkEl.textContent = i;
         if (i === currentPage) {
-          liEl.addClass("active");
+          liEl.className += " active";
         }
-        liEl.insertBefore(nextEl);
-        liEl.data("page", i);
+        liEl.setAttribute("data-page", i);
+        liEl.appendChild(linkEl);
+        ulEl.insertBefore(liEl, nextEl);
+        /*liEl = jQuery("<li />", class: "ex-pg-page").append(
+          jQuery("<a />", href: "#", text: i)
+        )
+        
+        liEl.addClass("active") if i is currentPage
+        liEl.insertBefore(nextEl)
+        liEl.data("page", i)
+        */
+
         _results.push(i++);
       }
       return _results;
@@ -583,10 +732,10 @@
       totalPages = this.getTotalPages();
       if (totalPages <= 1) {
         if (!this.get("alwaysVisible")) {
-          this.get("containers").hide("fast");
+          this.get("container").hide("fast");
         }
       } else if (!this.get("alwaysVisible")) {
-        this.get("containers").show("fast");
+        this.get("container").show("fast");
       }
       if (this.getCurrentPage() > totalPages) {
         this.setPage(totalPages);
@@ -621,7 +770,7 @@
     Paginator.prototype.initEvents = function() {
       var select,
         _this = this;
-      this.get("containers").on("click", "li", this._handlePageChange);
+      this.get("container").on("click", "li", this._handlePageChange);
       if (select = this.get("rowsPerPageSelect")) {
         select = jQuery(select);
         return select.on("change", function(event) {
@@ -668,7 +817,7 @@
         href: "#",
         text: "Last"
       })).data("page", "last"));
-      return this.get("containers").empty().append(ulEl);
+      return this.get("container").empty().append(ulEl);
     };
 
     return Paginator;
