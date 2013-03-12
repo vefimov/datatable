@@ -63,12 +63,16 @@
 
     $.extend(DataTable.prototype, Ex.AttributeProvider.prototype);
 
+    DataTable.prototype._data = [];
+
+    /*
+     * @constructor
+    */
+
+
     function DataTable(container, configs) {
-      var defaults, sortedBy,
+      var defaults,
         _this = this;
-      this.render = function() {
-        return DataTable.prototype.render.apply(_this, arguments);
-      };
       this.onThClick = function(event) {
         return DataTable.prototype.onThClick.apply(_this, arguments);
       };
@@ -77,6 +81,9 @@
       };
       this.onCellClick = function(event) {
         return DataTable.prototype.onCellClick.apply(_this, arguments);
+      };
+      this.render = function() {
+        return DataTable.prototype.render.apply(_this, arguments);
       };
       defaults = {
         paginator: null,
@@ -90,74 +97,132 @@
       };
       this.container = jQuery(container).empty().get(0);
       this.cfg = $.extend(defaults, configs);
-      this.theadEl = this.container.appendChild(this.container.createTHead());
-      this.tbodyEl = this.container.appendChild(this.container.createTBody());
-      this.renderColumns();
-      sortedBy = this.get("sortedBy");
-      if (sortedBy.key) {
-        this.sortColumn(this.getColumn("key", sortedBy.key), sortedBy.dir);
-      }
       this.render();
       this.initEvents();
     }
 
+    /*
+     * Get data by index
+     * @param {Number} (Optional) index
+     * @return {Object}
+    */
+
+
+    DataTable.prototype.getData = function(index) {
+      if (index) {
+        return this._data[index];
+      }
+      return this._data;
+    };
+
+    /*
+     * Inserts given Column at the index if given, otherwise at the end
+     * @param {Object} column
+     * @param {Number} index - (Optional) New tree index
+    */
+
+
+    DataTable.prototype.addColumn = function(column, index) {
+      var columns;
+      columns = this.get("columns");
+      if (!index) {
+        index = columns.length;
+      }
+      columns.splice(index, 0, column);
+      this.renderColumns();
+      return this.render();
+    };
+
+    /*
+     * Removes the column.
+     * @param {String} key - the key of the column
+    */
+
+
+    DataTable.prototype.removeColumn = function(key) {
+      var column, columns, i, _i, _len, _results;
+      columns = this.get("columns");
+      _results = [];
+      for (i = _i = 0, _len = columns.length; _i < _len; i = ++_i) {
+        column = columns[i];
+        if ((column != null ? column.key : void 0) === key) {
+          columns.splice(i, 1);
+          _results.push(jQuery(".ex-dt-col-" + key).remove());
+        } else {
+          _results.push(void 0);
+        }
+      }
+      return _results;
+    };
+
+    /*
+     * Hides the column.
+     * @param {String} key - the key of the column
+    */
+
+
+    DataTable.prototype.showColumn = function(key) {
+      return jQuery(".ex-dt-col-" + key).show();
+    };
+
+    /*
+     * Hides the column.
+     * @param {String} key - the key of the column
+    */
+
+
+    DataTable.prototype.hideColumn = function(key) {
+      return jQuery(".ex-dt-col-" + key).hide();
+    };
+
+    /*
+     * Sorts given column.
+     * @param {Object} column
+     * @param {String} dir - ASC or DESC
+    */
+
+
+    DataTable.prototype.sortColumn = function(column, dir) {
+      this.set("sortedBy", {
+        key: column.key,
+        dir: dir
+      });
+      $(column.thEl).addClass("ex-dt-" + (dir.toLowerCase())).parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc");
+      this.getStore().sort(column.key, dir);
+      return this.refresh();
+    };
+
+    /*
+     * Init events
+    */
+
+
     DataTable.prototype.initEvents = function() {
       var filter, paginator, _i, _len, _ref1;
       if (paginator = this.get("paginator")) {
-        paginator.on("currentPageChange", this.render);
-        paginator.on("rowsPerPageChange", this.render);
+        paginator.on("currentPageChange", this.refresh());
+        paginator.on("rowsPerPageChange", this.refresh());
       }
-      this.getStore().on("onDataChange", function(data) {
-        if (paginator) {
+      if (paginator) {
+        this.getStore().on("onDataChange", function(data) {
           return paginator.setTotalRecords(data.length);
-        }
-      });
+        });
+      }
       _ref1 = this.get("filters");
       for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
         filter = _ref1[_i];
-        filter.on("valueChange", this.render);
+        filter.on("valueChange", this.refresh());
       }
       jQuery(this.container).on("click", "thead th", this.onThClick);
       jQuery(this.container).on("click", "tbody tr", this.onRowClick);
       return jQuery(this.container).on("click", "tbody td", this.onCellClick);
     };
 
-    DataTable.prototype.onCellClick = function(event) {
-      var tdEl;
-      tdEl = event.currentTarget;
-      return this.emit("onCellClick", {
-        event: event,
-        column: tdEl.exData.column,
-        record: tdEl.exData.record
-      });
-    };
-
-    DataTable.prototype.onRowClick = function(event) {
-      var trEl;
-      trEl = event.currentTarget;
-      return this.emit("onRowClick", {
-        event: event,
-        column: trEl.exData.column,
-        record: trEl.exData.record
-      });
-    };
-
-    DataTable.prototype.onThClick = function(event) {
-      var column, dir, thEl;
-      thEl = event.currentTarget;
-      column = thEl.exData.column;
-      this.emit("onThClick", {
-        event: event,
-        column: column
-      });
-      if (column.sortable) {
-        dir = this.get("sortedBy").dir === "ASC" ? "DESC" : "ASC";
-        return this.sortColumn(column, dir);
-      }
-    };
-
     /*
      * Find column by attribute name and its value
+     * @param {String} attrName - attribute by which you want to search сolumn
+     * @param {String} attrValue - value of attribute
+     * @return {Object|null}
     */
 
 
@@ -175,6 +240,7 @@
 
     /*
      * Get store instance
+     * @return {Ex.Store}
     */
 
 
@@ -182,29 +248,21 @@
       return this.get("store");
     };
 
-    /*getData: ->
-      @_data
-      
-    setData: (data) ->
-      @_data = data
-    */
-
-
     /*
      * Render the TH elements
     */
 
 
     DataTable.prototype.renderColumns = function() {
-      var classes, column, columns, divEl, thEl, theadRowEl, _i, _len;
-      jQuery(this.theadEl).empty();
+      var classes, column, columns, divEl, i, thEl, theadRowEl, _i, _len;
+      this.theadEl.innerHTML = '';
       theadRowEl = this.theadEl.insertRow(0);
       columns = this.get("columns");
-      for (_i = 0, _len = columns.length; _i < _len; _i++) {
-        column = columns[_i];
+      for (i = _i = 0, _len = columns.length; _i < _len; i = ++_i) {
+        column = columns[i];
         thEl = theadRowEl.appendChild(document.createElement("th"));
         thEl.exData = {
-          column: column
+          columnIndex: i
         };
         if (column.width) {
           thEl.width = column.width;
@@ -235,6 +293,19 @@
 
 
     DataTable.prototype.render = function() {
+      var sortedBy;
+      this.theadEl = this.container.appendChild(this.container.createTHead());
+      this.tbodyEl = this.container.appendChild(this.container.createTBody());
+      this.renderColumns();
+      sortedBy = this.get("sortedBy");
+      if (sortedBy.key) {
+        return this.sortColumn(this.getColumn("key", sortedBy.key), sortedBy.dir);
+      } else {
+        return this.refresh();
+      }
+    };
+
+    DataTable.prototype.refresh = function() {
       var column, columns, divEl, filter, filters, from, i, j, paginator, record, rowFormatter, sortedBy, storeData, tdEl, to, trEl, _i, _j, _k, _len, _len1, _len2;
       console.time("Rendering data");
       storeData = this.getStore().getData();
@@ -260,14 +331,15 @@
         from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage();
         to = paginator.getCurrentPage() * paginator.getRowsPerPage();
       }
-      storeData = storeData.slice(from, to);
-      jQuery(this.tbodyEl).empty();
+      storeData = this._data = storeData.slice(from, to);
+      this.tbodyEl.innerHTML = '';
       for (i = _j = 0, _len1 = storeData.length; _j < _len1; i = ++_j) {
         record = storeData[i];
         trEl = this.tbodyEl.insertRow(i);
-        trEl.exData = {
-          record: record
-        };
+        /*trEl.exData =
+            dataIndex: i
+        */
+
         if (typeof rowFormatter === "function") {
           rowFormatter(trEl, record);
         }
@@ -275,12 +347,8 @@
         for (j = _k = 0, _len2 = columns.length; _k < _len2; j = ++_k) {
           column = columns[j];
           tdEl = trEl.insertCell(j);
-          tdEl.exData = {
-            columnIndex: j
-          };
           /*tdEl.exData =
-              column: column
-              record: record
+              columnIndex: j
           */
 
           tdEl.className = "ex-dt-col-" + column.key;
@@ -299,115 +367,90 @@
         }
         this.tbodyEl.appendChild(trEl);
       }
-      /*for record in storeData
-        trEl = jQuery "<tr />"
-        #yui-dt-even
-        rowFormatter?(trEl, record)
-        trEl.addClass "ex-dt-#{if _i % 2 then 'odd' else 'even'}"
-        
-        for column in columns
-          tdEl = jQuery "<td />"
-          
-          # call cell formatter
-          if typeof column.formatter is "function"
-            column.formatter tdEl, column, record
-          else
-            tdEl.append jQuery("<div />").text(record[column.key])
-          
-          if column.hidden
-            tdEl.addClass("hidden").css("display", "none")
-          
-          tdEl.on "click", (event) =>
-              @onCellClick(event, column, record, @)
-          
-          trEl.append tdEl
-        @tbodyEl.append trEl
-      */
-
       return console.timeEnd("Rendering data");
     };
 
     /*
-     * Custom event handler to sort Column.
+     * Invokes when a cell has a click.
+     * @param {Object} event - the event object
     */
 
 
-    /*onEventSortColumn: (column) =>
-      if column.sortable
-        dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
-        # Update UI via sortedBy
-        @sortColumn column, dir
-    */
-
+    DataTable.prototype.onCellClick = function(event) {
+      var column, columns, data, store, tdEl;
+      tdEl = event.currentTarget;
+      columns = this.get("columns");
+      store = this.get("store");
+      data = this.getData(tdEl.parentChild.rowIndex);
+      column = columns[tdEl.cellIndex];
+      return this.emit("onCellClick", {
+        event: event,
+        column: column,
+        store: store,
+        data: data
+      });
+    };
 
     /*
-     * Sorts given Column.
+     * Invokes when a row has a click.
+     * @param {Object} event - the event object
     */
 
 
-    DataTable.prototype.sortColumn = function(column, dir) {
-      this.set("sortedBy", {
-        key: column.key,
-        dir: dir
+    DataTable.prototype.onRowClick = function(event) {
+      var data, store, trEl;
+      trEl = event.currentTarget;
+      data = this._data[trEl.rowIndex];
+      store = this.get("store");
+      return this.emit("onRowClick", {
+        event: event,
+        store: store = this.get("store"),
+        data: data
       });
-      $(column.thEl).addClass("ex-dt-" + (dir.toLowerCase())).parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc");
-      return this.getStore().sort(column.key, dir);
     };
 
-    DataTable.prototype.showColumn = function(key) {
-      return jQuery(".ex-dt-col-" + key).show();
-    };
+    /*
+     * Invokes when a col has a click.
+     * @param {Object} event - the event object
+    */
 
-    DataTable.prototype.hideColumn = function(key) {
-      return jQuery(".ex-dt-col-" + key).hide();
-    };
 
-    DataTable.prototype.removeColumn = function(key) {
-      var column, columns, i, _i, _len, _results;
+    DataTable.prototype.onThClick = function(event) {
+      var column, columns, dir, store, thEl;
+      thEl = event.currentTarget;
       columns = this.get("columns");
-      _results = [];
-      for (i = _i = 0, _len = columns.length; _i < _len; i = ++_i) {
-        column = columns[i];
-        if (column.key === key) {
-          columns.splice(i, 1);
-          _results.push(this.hideColumn(key));
-        } else {
-          _results.push(void 0);
-        }
+      column = columns[thEl.cellIndex];
+      this.emit("onThClick", {
+        event: event,
+        column: column,
+        store: store = this.get("store")
+      });
+      if (column.sortable) {
+        dir = this.get("sortedBy").dir === "ASC" ? "DESC" : "ASC";
+        return this.sortColumn(column, dir);
       }
-      return _results;
-    };
-
-    DataTable.prototype.addColumn = function(column, index) {
-      var columns;
-      if (index == null) {
-        index = 0;
-      }
-      columns = this.get("columns");
-      columns.splice(index, 0, column);
-      this.renderColumns();
-      return this.render();
     };
 
     return DataTable;
 
   })();
 
-  /*getColumnByKey: (key) ->
-      for column in @get("columns")
-          if column.key is key
-              return column
+  /* **********************************************************************
   */
 
 
-  /*class Ex.DataTable.Column
-      $.extend @prototype, Ex.AttributeProvider.prototype
-      constructor: ->
+  /* **********************************************************************
+  */
+
+
+  /* **********************************************************************
   */
 
 
   /*
    * The Store class encapsulates a client side cache of Model objects
+   * The constructor accepts the following parameters:
+   *  - configs {Object} (optional) Object literal of configuration values.
   */
 
 
@@ -417,15 +460,33 @@
 
     Store.prototype._data = [];
 
+    /*
+     * @constructor
+    */
+
+
     function Store(configs) {
       this.setData(configs.data);
       this.cfg = {};
     }
 
+    /*
+     * Set the data
+     * @param {Object} data
+    */
+
+
     Store.prototype.setData = function(data) {
       this._data = jQuery.extend([], data);
       return this.emit("onDataChange", this._data);
     };
+
+    /*
+     * Get the data
+     * @param {Number} index
+     * @return {Object}
+    */
+
 
     Store.prototype.getData = function(index) {
       if (typeof index !== "number") {
@@ -433,6 +494,12 @@
       }
       return this._data[index];
     };
+
+    /*
+     * Remove record from store
+     * @param {Number, Function}
+    */
+
 
     Store.prototype.remove = function(item) {
       var i, record, result, _i, _len, _ref1, _results;
@@ -457,12 +524,24 @@
       }
     };
 
+    /*
+     * Sort the data
+     * @param {String} key - the key by with sort data
+     * @param {String} dir - ASC or DESC
+    */
+
+
+    Store.prototype.sort = function(key, dir) {};
+
     return Store;
 
   })();
 
   /*
    * Small helper class to make creating stores from Array data easier
+   * @namespace Ex
+   * @class ArrayStore
+   * @extends Ex.Store
   */
 
 
@@ -473,6 +552,13 @@
     function ArrayStore(configs) {
       ArrayStore.__super__.constructor.apply(this, arguments);
     }
+
+    /*
+     * Sort the data
+     * @param {String} key - the key by with sort data
+     * @param {String} dir - ASC or DESC
+    */
+
 
     ArrayStore.prototype.sort = function(key, dir) {
       this.getData().sort(function(a, b) {
@@ -505,7 +591,10 @@
   })(Ex.Store);
 
   /*
-   *
+   * Small helper class to make creating stores from HTML table easier
+   * @namespace Ex
+   * @class TableStore
+   * @extends Ex.ArrayStore
   */
 
 
@@ -518,13 +607,13 @@
       fields = config.fields;
       data = [];
       jQuery("tbody tr", configs.container).each(function(key, rowEl) {
-        var cells, field, obj, _i, _len, _results;
+        var cells, field, i, obj, _i, _len, _results;
         cells = $(rowEl).find(">td");
         _results = [];
-        for (_i = 0, _len = fields.length; _i < _len; _i++) {
-          field = fields[_i];
+        for (i = _i = 0, _len = fields.length; _i < _len; i = ++_i) {
+          field = fields[i];
           obj = {};
-          obj[field] = cells.eq(_i).text();
+          obj[field] = cells.eq(i).text();
           _results.push(data.push(obj));
         }
         return _results;

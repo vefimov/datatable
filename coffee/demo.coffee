@@ -4,11 +4,11 @@ $ ->
     fistNameFormatter = (tdEl, column, data) ->
         unless data.id % 10
             $(tdEl).css("background", "rgb(199, 255, 199)")
-        $(tdEl).text(data.first_name)
+        tdEl.appendChild document.createTextNode(data.first_name)
 
 
     rowFormatter = (trEl, data) ->
-        $(trEl).addClass("error") unless data.id % 20
+        trEl.className += "error" unless data.id % 20
 
 
     columns = [
@@ -73,16 +73,16 @@ $ ->
 
         $("#add-row").click ->
             store.getData().unshift data[0]
-            datatable.render()
+            datatable.refresh()
 
         $("#update-row").click ->
-            console.log store.getData(0)
+            #console.log store.getData(0)
             store.getData(0).first_name = "Pupkin"
-            datatable.render()
+            datatable.refresh()
 
         $("#delete-row").click ->
             store.remove(0)
-            datatable.render()
+            datatable.refresh()
 
         #---------------------------------------
         $("#show-col").click ->
@@ -93,3 +93,6 @@ $ ->
 
         $("#delete-col").click ->
             datatable.removeColumn("first_name")
+
+        $("#add-col").click ->
+            datatable.addColumn(columns[2], 2)

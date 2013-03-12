@@ -35,15 +35,17 @@ class Ex.AttributeProvider
 class Ex.DataTable
     $.extend @prototype, Ex.AttributeProvider.prototype
 
-    #_data: []
+    _data: []
 
+    ###
+     * @constructor
+    ###
     constructor: (container, configs) ->
         defaults =
             paginator: null
             columns: [] # Array of object literal Column definitions.
             store: null # DataSource instance
             filters: []
-            #fields: null # list of the fields
             sortedBy:
                 key: null,
                 dir: "ASC"
@@ -51,67 +53,96 @@ class Ex.DataTable
         @container = jQuery(container).empty().get(0)
         @cfg = $.extend(defaults, configs)
 
-        @theadEl = @container.appendChild @container.createTHead()
-        @tbodyEl = @container.appendChild @container.createTBody()
-        @renderColumns()
-
-        sortedBy = @get("sortedBy")
-        if sortedBy.key
-            @sortColumn(@getColumn("key", sortedBy.key), sortedBy.dir)
-
-
-
         @render()
         @initEvents()
 
-    initEvents: ->
-        if paginator = @get("paginator")
-            paginator.on "currentPageChange", @render
-            paginator.on "rowsPerPageChange", @render
+    ###
+     * Get data by index
+     * @param {Number} (Optional) index
+     * @return {Object}
+    ###
+    getData: (index) ->
+        return @_data[index] if index
+        @_data
 
-        @getStore().on "onDataChange", (data) ->
-            if paginator
+    ###
+     * Inserts given Column at the index if given, otherwise at the end
+     * @param {Object} column
+     * @param {Number} index - (Optional) New tree index
+    ###
+    addColumn: (column, index) ->
+        columns = @get("columns")
+        index = columns.length unless index
+        columns.splice index, 0, column
+        @renderColumns()
+        @render()
+
+    ###
+     * Removes the column.
+     * @param {String} key - the key of the column
+    ###
+    removeColumn: (key) ->
+        columns = @get("columns")
+        for column, i in columns
+            if column?.key is key
+                columns.splice i,1
+                jQuery(".ex-dt-col-#{key}").remove()
+
+    ###
+     * Hides the column.
+     * @param {String} key - the key of the column
+    ###
+    showColumn: (key) ->
+        jQuery(".ex-dt-col-#{key}").show()
+
+    ###
+     * Hides the column.
+     * @param {String} key - the key of the column
+    ###
+    hideColumn: (key) ->
+        jQuery(".ex-dt-col-#{key}").hide()
+
+    ###
+     * Sorts given column.
+     * @param {Object} column
+     * @param {String} dir - ASC or DESC
+    ###
+    sortColumn: (column, dir) ->
+        @set("sortedBy", key: column.key, dir: dir)
+        $(column.thEl).addClass("ex-dt-#{dir.toLowerCase()}")
+            .parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc")
+
+        @getStore().sort column.key, dir
+        @refresh()
+
+    ###
+     * Init events
+    ###
+    initEvents: ->
+        # listen paginator events
+        if paginator = @get("paginator")
+            paginator.on "currentPageChange", @refresh()
+            paginator.on "rowsPerPageChange", @refresh()
+
+        # listen paginator events
+        if paginator
+            @getStore().on "onDataChange", (data) ->
                 paginator.setTotalRecords data.length
 
-        #@render()
-
+        # listen filters events
         for filter in @get("filters")
-            filter.on "valueChange", @render
+            filter.on "valueChange", @refresh()
 
+        # add handler to th, tr, td elements
         jQuery(@container).on "click", "thead th", @onThClick
         jQuery(@container).on "click", "tbody tr", @onRowClick
         jQuery(@container).on "click", "tbody td", @onCellClick
 
-
-    onCellClick: (event) =>
-        tdEl = event.currentTarget
-        @emit "onCellClick",
-            event: event
-            column: tdEl.exData.column
-            record: tdEl.exData.record
-
-    onRowClick: (event) =>
-        trEl = event.currentTarget
-        @emit "onRowClick",
-            event: event
-            column: trEl.exData.column
-            record: trEl.exData.record
-
-    onThClick: (event) =>
-        thEl = event.currentTarget
-        column = thEl.exData.column
-
-        @emit "onThClick",
-            event: event
-            column: column
-
-        if column.sortable
-            dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
-            # Update UI via sortedBy
-            @sortColumn column, dir
-
     ###
      * Find column by attribute name and its value
+     * @param {String} attrName - attribute by which you want to search сolumn
+     * @param {String} attrValue - value of attribute
+     * @return {Object|null}
     ###
     getColumn: (attrName, attrValue) ->
         columns = @get("columns")
@@ -121,30 +152,25 @@ class Ex.DataTable
 
     ###
      * Get store instance
+     * @return {Ex.Store}
     ###
     getStore: ->
         @get("store")
-
-    ###getData: ->
-      @_data
-      
-    setData: (data) ->
-      @_data = data###
 
     ###
      * Render the TH elements
     ###
     renderColumns: ->
-        #@theadEl = @container.createTHead()
-        #@tbodyEl = @container.createTBody()
-        jQuery(@theadEl).empty() #.innerHTML = ''
+        @theadEl.innerHTML = ''
 
         theadRowEl = @theadEl.insertRow 0
         columns = @get("columns")
 
-        for column in columns
+        for column, i in columns
+            # create the th element
             thEl = theadRowEl.appendChild document.createElement("th")
-            thEl.exData = column: column
+            thEl.exData =
+                columnIndex: i
             thEl.width = column.width if column.width
 
             classes = ["ex-dt-col-#{column.key}"]
@@ -160,7 +186,6 @@ class Ex.DataTable
             divEl.className = "ex-dt-cell-inner"
             divEl.appendChild document.createTextNode column.label
             thEl.appendChild divEl
-            #thEl.on "click", @onEventSortColumn.bind null, column
 
             column.thEl = thEl
             theadRowEl.appendChild thEl
@@ -171,6 +196,18 @@ class Ex.DataTable
      * Renders the view with existing records
     ###
     render: =>
+        # build table structure
+        @theadEl = @container.appendChild @container.createTHead()
+        @tbodyEl = @container.appendChild @container.createTBody()
+        @renderColumns()
+
+        sortedBy = @get("sortedBy")
+        if sortedBy.key
+            @sortColumn(@getColumn("key", sortedBy.key), sortedBy.dir)
+        else
+            @refresh()
+
+    refresh: ->
         console.time("Rendering data")
         #tore = @getStore()
         storeData = @getStore().getData()
@@ -190,34 +227,28 @@ class Ex.DataTable
 
         from = 0
         to = 10
-        #storeData.length
 
         if paginator
             from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage()
             to = paginator.getCurrentPage() * paginator.getRowsPerPage()
 
-        storeData = storeData.slice from, to
+        storeData = @_data = storeData.slice from, to
 
-        #@tbodyEl.empty()
-
-        #tbodyEl = @tbodyEl
-        jQuery(@tbodyEl).empty() #.innerHTML = ''
+        @tbodyEl.innerHTML = ''
 
         for record, i in storeData
             trEl = @tbodyEl.insertRow i
             #trEl.exData = record:recor
-            trEl.exData =
-                record: record
+            ###trEl.exData =
+                dataIndex: i###
             rowFormatter?(trEl, record)
             trEl.className = "ex-dt-#{if i % 2 then 'odd' else 'even'}"
 
             for column, j in columns
                 tdEl = trEl.insertCell j
-                tdEl.exData =
-                    columnIndex: j
                 ###tdEl.exData =
-                    column: column
-                    record: record###
+                    columnIndex: j###
+
                 tdEl.className = "ex-dt-col-#{column.key}"
 
                 # call cell formatter
@@ -236,103 +267,98 @@ class Ex.DataTable
 
             @tbodyEl.appendChild trEl
 
-        ###for record in storeData
-          trEl = jQuery "<tr />"
-          #yui-dt-even
-          rowFormatter?(trEl, record)
-          trEl.addClass "ex-dt-#{if _i % 2 then 'odd' else 'even'}"
-          
-          for column in columns
-            tdEl = jQuery "<td />"
-            
-            # call cell formatter
-            if typeof column.formatter is "function"
-              column.formatter tdEl, column, record
-            else
-              tdEl.append jQuery("<div />").text(record[column.key])
-            
-            if column.hidden
-              tdEl.addClass("hidden").css("display", "none")
-            
-            tdEl.on "click", (event) =>
-                @onCellClick(event, column, record, @)
-            
-            trEl.append tdEl
-          @tbodyEl.append trEl###
-
         console.timeEnd("Rendering data")
 
     ###
-     * Custom event handler to sort Column.
+     * Invokes when a cell has a click.
+     * @param {Object} event - the event object
     ###
-    ###onEventSortColumn: (column) =>
-      if column.sortable
-        dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
-        # Update UI via sortedBy
-        @sortColumn column, dir###
-
-    ###
-     * Sorts given Column. 
-    ###
-    sortColumn: (column, dir) ->
-        @set("sortedBy", key: column.key, dir: dir)
-        $(column.thEl).addClass("ex-dt-#{dir.toLowerCase()}")
-            .parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc")
-
-        @getStore().sort column.key, dir
-    #@render()
-
-
-    showColumn: (key) ->
-        jQuery(".ex-dt-col-#{key}").show()
-
-    hideColumn: (key) ->
-        jQuery(".ex-dt-col-#{key}").hide()
-
-    removeColumn: (key) ->
+    onCellClick: (event) =>
+        tdEl = event.currentTarget
         columns = @get("columns")
-        for column, i in columns
-            if column.key is key
-                columns.splice i,1
-                @hideColumn(key)
+        store = @get("store")
+        data = @getData(tdEl.parentChild.rowIndex)
+        column = columns[tdEl.cellIndex]
+        @emit "onCellClick",
+            event: event
+            column: column
+            store: store
+            data: data
 
-    addColumn: (column, index=0) ->
+    ###
+     * Invokes when a row has a click.
+     * @param {Object} event - the event object
+    ###
+    onRowClick: (event) =>
+        trEl = event.currentTarget
+        data = @_data[trEl.rowIndex]
+        store = @get("store")
+        @emit "onRowClick",
+            event: event
+            store: store = @get("store")
+            data: data
+
+    ###
+     * Invokes when a col has a click.
+     * @param {Object} event - the event object
+    ###
+    onThClick: (event) =>
+        thEl = event.currentTarget
         columns = @get("columns")
-        columns.splice index, 0, column
-        @renderColumns()
-        @render()
+        column = columns[thEl.cellIndex]
 
-###getColumnByKey: (key) ->
-    for column in @get("columns")
-        if column.key is key
-            return column###
+        @emit "onThClick",
+            event: event
+            column: column
+            store: store = @get("store")
 
+        if column.sortable
+            dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
+            # Update UI via sortedBy
+            @sortColumn column, dir
 
-###class Ex.DataTable.Column
-    $.extend @prototype, Ex.AttributeProvider.prototype
-    constructor: ->###
-
+### ********************************************************************** ###
+### ********************************************************************** ###
+### ********************************************************************** ###
 
 ###
  * The Store class encapsulates a client side cache of Model objects
+ * The constructor accepts the following parameters:
+ *  - configs {Object} (optional) Object literal of configuration values.
 ###
 class Ex.Store
     $.extend @prototype, Ex.AttributeProvider.prototype
 
     _data: []
 
+    ###
+     * @constructor
+    ###
     constructor: (configs) ->
         @setData configs.data
         @cfg = {}
 
+    ###
+     * Set the data
+     * @param {Object} data
+    ###
     setData: (data) ->
         @_data = jQuery.extend [], data
         @emit "onDataChange", @_data
 
+    ###
+     * Get the data
+     * @param {Number} index
+     * @return {Object}
+    ###
     getData: (index) ->
         return @_data if typeof(index) isnt "number"
         @_data[index]
 
+    ###
+     * Remove record from store
+     * @param {Number, Function}
+    ###
     remove: (item) ->
         switch typeof(item)
             when "number"
@@ -344,16 +370,29 @@ class Ex.Store
                         @_data.splice index, 1
                     else if result is false
                         break
-#sortData: (key, dir) ->
+    ###
+     * Sort the data
+     * @param {String} key - the key by with sort data
+     * @param {String} dir - ASC or DESC
+    ###
+    sort: (key, dir) ->
 
 
 ###
  * Small helper class to make creating stores from Array data easier
+ * @namespace Ex
+ * @class ArrayStore
+ * @extends Ex.Store
 ###
 class Ex.ArrayStore extends Ex.Store
     constructor: (configs) ->
         super
 
+    ###
+     * Sort the data
+     * @param {String} key - the key by with sort data
+     * @param {String} dir - ASC or DESC
+    ###
     sort: (key, dir) ->
         # sort the data
         @getData().sort (a, b) ->
@@ -370,19 +409,20 @@ class Ex.ArrayStore extends Ex.Store
         @emit "onDataChange", @getData()
 
 ###
- * 
+ * Small helper class to make creating stores from HTML table easier
+ * @namespace Ex
+ * @class TableStore
+ * @extends Ex.ArrayStore
 ###
 class Ex.TableStore extends Ex.ArrayStore
     constructor: (configs) ->
-        #config.fields  
-        #
         fields = config.fields
         data = []
         jQuery("tbody tr", configs.container).each (key, rowEl) ->
             cells = $(rowEl).find(">td")
-            for field in fields
+            for field, i in fields
                 obj = {}
-                obj[field] = cells.eq(_i).text()
+                obj[field] = cells.eq(i).text()
                 data.push obj
         configs =
             data: data

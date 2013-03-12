@@ -10,11 +10,11 @@
       if (!(data.id % 10)) {
         $(tdEl).css("background", "rgb(199, 255, 199)");
       }
-      return $(tdEl).text(data.first_name);
+      return tdEl.appendChild(document.createTextNode(data.first_name));
     };
     rowFormatter = function(trEl, data) {
       if (!(data.id % 20)) {
-        return $(trEl).addClass("error");
+        return trEl.className += "error";
       }
     };
     columns = [
@@ -77,20 +77,21 @@
       }
     }, $("#add-row").click(function() {
       store.getData().unshift(data[0]);
-      return datatable.render();
+      return datatable.refresh();
     }), $("#update-row").click(function() {
-      console.log(store.getData(0));
       store.getData(0).first_name = "Pupkin";
-      return datatable.render();
+      return datatable.refresh();
     }), $("#delete-row").click(function() {
       store.remove(0);
-      return datatable.render();
+      return datatable.refresh();
     }), $("#show-col").click(function() {
       return datatable.showColumn("hidden");
     }), $("#hide-col").click(function() {
       return datatable.hideColumn("id");
     }), $("#delete-col").click(function() {
       return datatable.removeColumn("first_name");
+    }), $("#add-col").click(function() {
+      return datatable.addColumn(columns[2], 2);
     }));
   });
 
