@@ -5,7 +5,7 @@
   example = {};
 
   $(function() {
-    var columns, data, datatable, fistNameFormatter, i, rowFormatter, store;
+    var columns, data, datatable, fistNameFormatter, i, rowFormatter, store, xhrStore;
     fistNameFormatter = function(tdEl, column, data) {
       if (!(data.id % 10)) {
         $(tdEl).css("background", "rgb(199, 255, 199)");
@@ -57,20 +57,24 @@
     store = new Ex.ArrayStore({
       data: data
     });
+    xhrStore = new Ex.RemoteStore({
+      url: "json.php"
+    });
     return datatable = new Ex.DataTable("table", {
       columns: columns,
-      store: store,
+      store: xhrStore,
       rowFormatter: rowFormatter,
-      /*paginator: new Ex.Paginator
-        container: '.pagination'
-        totalRecords: 200
-        rowsPerPage: 10
+      paginator: new Ex.Paginator({
+        container: '.pagination',
+        totalRecords: 200,
+        rowsPerPage: 10,
         rowsPerPageSelect: "#rows-per-page"
+      }),
       filters: [
-        new Ex.Filter.Search container: "#search"
-      ]
-      */
-
+        new Ex.Filter.Search({
+          container: "#search"
+        })
+      ],
       sortedBy: {
         key: "id",
         dir: "ASC"

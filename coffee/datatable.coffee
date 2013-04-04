@@ -16,6 +16,7 @@ class Ex.AttributeProvider
      * Sets the value of a config.
     ###
     set: (name, value) ->
+        @cfg ?= {}
         #if @cfg[name] isnt value
         @cfg[name] = value
         @emit "#{name}Change", value
@@ -24,6 +25,7 @@ class Ex.AttributeProvider
      * Returns the current value of the attribute.
     ###
     get: (name) ->
+        @cfg ?= {}
         return @cfg[name]
 
 ###
@@ -121,17 +123,17 @@ class Ex.DataTable
     initEvents: ->
         # listen paginator events
         if paginator = @get("paginator")
-            paginator.on "currentPageChange", @refresh()
-            paginator.on "rowsPerPageChange", @refresh()
+            paginator.on "currentPageChange", @refresh
+            paginator.on "rowsPerPageChange", @refresh
 
         # listen paginator events
-        if paginator
+        ###if paginator
             @getStore().on "onDataChange", (data) ->
-                paginator.setTotalRecords data.length
+                paginator.setTotalRecords data.length###
 
         # listen filters events
         for filter in @get("filters")
-            filter.on "valueChange", @refresh()
+            filter.on "valueChange", @refresh
 
         # add handler to th, tr, td elements
         jQuery(@container).on "click", "thead th", @onThClick
@@ -207,67 +209,65 @@ class Ex.DataTable
         else
             @refresh()
 
-    refresh: ->
+    refresh: =>
         console.time("Rendering data")
         #tore = @getStore()
-        storeData = @getStore().getData()
-        columns = @get("columns")
-        sortedBy = @get("sortedBy")
-        rowFormatter = @get("rowFormatter")
-        paginator = @get("paginator")
-        filters = @get("filters")
+        @getStore().getData @cfg.sortedBy, (storeData) =>
+            console.log storeData
+            columns = @get("columns")
+            #sortedBy = @get("sortedBy")
+            rowFormatter = @get("rowFormatter")
+            paginator = @get("paginator")
+            filters = @get("filters")
 
-        #if filters.length
-        for filter in filters
-            if filter.isSelected()
-                storeData = storeData.filter (element, index, array)->
-                    filter.filter(element, index, array)
+            #if filters.length
+            for filter in filters
+                if filter.isSelected()
+                    storeData = storeData.filter (element, index, array)->
+                        filter.filter(element, index, array)
 
-        paginator.setTotalRecords(storeData.length) if paginator
+            #paginator.setTotalRecords(storeData.length) if paginator
 
-        from = 0
-        to = 10
+            if paginator
+                from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage()
+                to = paginator.getCurrentPage() * paginator.getRowsPerPage()
 
-        if paginator
-            from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage()
-            to = paginator.getCurrentPage() * paginator.getRowsPerPage()
+            storeData = @_data = storeData.slice from, to
 
-        storeData = @_data = storeData.slice from, to
+            @tbodyEl.innerHTML = ''
 
-        @tbodyEl.innerHTML = ''
+            for record, i in storeData
+                trEl = @tbodyEl.insertRow i
+                #trEl.exData = record:recor
+                ###trEl.exData =
+                    dataIndex: i###
+                rowFormatter?(trEl, record)
+                trEl.className = "ex-dt-#{if i % 2 then 'odd' else 'even'}"
 
-        for record, i in storeData
-            trEl = @tbodyEl.insertRow i
-            #trEl.exData = record:recor
-            ###trEl.exData =
-                dataIndex: i###
-            rowFormatter?(trEl, record)
-            trEl.className = "ex-dt-#{if i % 2 then 'odd' else 'even'}"
+                for column, j in columns
+                    tdEl = trEl.insertCell j
+                    ###tdEl.exData =
+                        columnIndex: j###
 
-            for column, j in columns
-                tdEl = trEl.insertCell j
-                ###tdEl.exData =
-                    columnIndex: j###
+                    tdEl.className = "ex-dt-col-#{column.key}"
 
-                tdEl.className = "ex-dt-col-#{column.key}"
+                    # call cell formatter
+                    if typeof column.formatter is "function"
+                        column.formatter tdEl, column, record
+                    else
+                        divEl = document.createElement "div"
+                        divEl.className = "ex-dt-cell-inner"
+                        divEl.appendChild document.createTextNode(record[column.key])
+                        tdEl.appendChild divEl
 
-                # call cell formatter
-                if typeof column.formatter is "function"
-                    column.formatter tdEl, column, record
-                else
-                    divEl = document.createElement "div"
-                    divEl.className = "ex-dt-cell-inner"
-                    divEl.appendChild document.createTextNode(record[column.key])
-                    tdEl.appendChild divEl
-
-                if column.hidden
-                    tdEl.className += " hidden"
-                    tdEl.style.display = "none"
+                    if column.hidden
+                        tdEl.className += " hidden"
+                        tdEl.style.display = "none"
 
 
-            @tbodyEl.appendChild trEl
+                @tbodyEl.appendChild trEl
 
-        console.timeEnd("Rendering data")
+            console.timeEnd("Rendering data")
 
     ###
      * Invokes when a cell has a click.
@@ -277,7 +277,8 @@ class Ex.DataTable
         tdEl = event.currentTarget
         columns = @get("columns")
         store = @get("store")
-        data = @getData(tdEl.parentChild.rowIndex)
+
+        data = @getData(tdEl.parentNode.rowIndex)
         column = columns[tdEl.cellIndex]
         @emit "onCellClick",
             event: event
@@ -335,8 +336,8 @@ class Ex.Store
      * @constructor
     ###
     constructor: (configs) ->
-        @setData configs.data
-        @cfg = {}
+        configs ?= {}
+        @cfg = configs
 
     ###
      * Set the data
@@ -348,12 +349,10 @@ class Ex.Store
 
     ###
      * Get the data
-     * @param {Number} index
      * @return {Object}
     ###
-    getData: (index) ->
-        return @_data if typeof(index) isnt "number"
-        @_data[index]
+    getData: (sortedBy, callback) ->
+        callback?(@_data)
 
     ###
      * Remove record from store
@@ -385,8 +384,16 @@ class Ex.Store
  * @extends Ex.Store
 ###
 class Ex.ArrayStore extends Ex.Store
+    paginator: null
+
     constructor: (configs) ->
-        super
+        super configs
+        @setData configs.data if configs.data
+
+    setData: (data) ->
+        super data
+        if paginator = @get("paginator")
+            paginator.setTotalRecords(@_data.length)
 
     ###
      * Sort the data
@@ -395,7 +402,8 @@ class Ex.ArrayStore extends Ex.Store
     ###
     sort: (key, dir) ->
         # sort the data
-        @getData().sort (a, b) ->
+        @getData (data) =>
+            data.sort (a, b) ->
             asc = dir is "ASC"
             val1 = a[key]
             val2 = b[key]
@@ -428,11 +436,39 @@ class Ex.TableStore extends Ex.ArrayStore
             data: data
         super config
 
+###
+ * You should specify in the costructor the following parameters
+ * - url
+###
+class Ex.RemoteStore extends Ex.Store
+    paginator: null
 
-class Ex.RemoteStore extends Ex.ArrayStore
     constructor: (configs) ->
-        super config
+        super configs
+        @paginator = configs?.paginator
+        console.warning "You should specity the url" unless configs.url
 
+    getData: (sortedBy, callback) ->
+        paginator = @get("paginator")
+        data = {}
+
+        if paginator
+            data.results = paginator.getRowsPerPage()
+            data.startIndex = paginator.getCurrentPage()
+
+        data.key = sortedBy.key
+        data.dir = sortedBy.dir
+
+        $.ajax
+            url: @get("url")
+            type: "POST"
+            data: data
+            dataType: "json"
+            success:(response, textStatus, jqXHR) =>
+                if paginator
+                    paginator.setTotalRecords(+response.totalRecords)
+
+                callback?(response.records)
 ###
  * Paginator 
  * Parameters:
@@ -592,7 +628,7 @@ class Ex.Paginator
     ###
      *  Fires the pageChange event when the state attributes have changed
     ###
-    _handleStateChange: ->
+    _handleStateChange: =>
         totalPages = @getTotalPages()
 
         if totalPages <= 1
@@ -662,7 +698,6 @@ class Ex.Filter
     $.extend @prototype, Ex.AttributeProvider.prototype
 
     constructor: (config) ->
-
 
     filter: (element, index, array) ->
 

@@ -52,19 +52,22 @@ $ ->
     store = new Ex.ArrayStore
         data: data
 
+    xhrStore = new Ex.RemoteStore
+        url: "json.php"
+
     datatable = new Ex.DataTable "table",
         columns: columns
         #fields: fields
-        store: store
+        store: xhrStore
         rowFormatter: rowFormatter
-        ###paginator: new Ex.Paginator
+        paginator: new Ex.Paginator
           container: '.pagination'
           totalRecords: 200
           rowsPerPage: 10
           rowsPerPageSelect: "#rows-per-page"
         filters: [
           new Ex.Filter.Search container: "#search"
-        ]###
+        ]
         sortedBy:
             key: "id"
             dir: "ASC"

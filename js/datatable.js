@@ -34,6 +34,10 @@
 
 
     AttributeProvider.prototype.set = function(name, value) {
+      var _ref1;
+      if ((_ref1 = this.cfg) == null) {
+        this.cfg = {};
+      }
       this.cfg[name] = value;
       return this.emit("" + name + "Change", value);
     };
@@ -44,6 +48,10 @@
 
 
     AttributeProvider.prototype.get = function(name) {
+      var _ref1;
+      if ((_ref1 = this.cfg) == null) {
+        this.cfg = {};
+      }
       return this.cfg[name];
     };
 
@@ -81,6 +89,9 @@
       };
       this.onCellClick = function(event) {
         return DataTable.prototype.onCellClick.apply(_this, arguments);
+      };
+      this.refresh = function() {
+        return DataTable.prototype.refresh.apply(_this, arguments);
       };
       this.render = function() {
         return DataTable.prototype.render.apply(_this, arguments);
@@ -200,18 +211,18 @@
     DataTable.prototype.initEvents = function() {
       var filter, paginator, _i, _len, _ref1;
       if (paginator = this.get("paginator")) {
-        paginator.on("currentPageChange", this.refresh());
-        paginator.on("rowsPerPageChange", this.refresh());
+        paginator.on("currentPageChange", this.refresh);
+        paginator.on("rowsPerPageChange", this.refresh);
       }
-      if (paginator) {
-        this.getStore().on("onDataChange", function(data) {
-          return paginator.setTotalRecords(data.length);
-        });
-      }
+      /*if paginator
+          @getStore().on "onDataChange", (data) ->
+              paginator.setTotalRecords data.length
+      */
+
       _ref1 = this.get("filters");
       for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
         filter = _ref1[_i];
-        filter.on("valueChange", this.refresh());
+        filter.on("valueChange", this.refresh);
       }
       jQuery(this.container).on("click", "thead th", this.onThClick);
       jQuery(this.container).on("click", "tbody tr", this.onRowClick);
@@ -306,68 +317,65 @@
     };
 
     DataTable.prototype.refresh = function() {
-      var column, columns, divEl, filter, filters, from, i, j, paginator, record, rowFormatter, sortedBy, storeData, tdEl, to, trEl, _i, _j, _k, _len, _len1, _len2;
+      var _this = this;
       console.time("Rendering data");
-      storeData = this.getStore().getData();
-      columns = this.get("columns");
-      sortedBy = this.get("sortedBy");
-      rowFormatter = this.get("rowFormatter");
-      paginator = this.get("paginator");
-      filters = this.get("filters");
-      for (_i = 0, _len = filters.length; _i < _len; _i++) {
-        filter = filters[_i];
-        if (filter.isSelected()) {
-          storeData = storeData.filter(function(element, index, array) {
-            return filter.filter(element, index, array);
-          });
+      return this.getStore().getData(this.cfg.sortedBy, function(storeData) {
+        var column, columns, divEl, filter, filters, from, i, j, paginator, record, rowFormatter, tdEl, to, trEl, _i, _j, _k, _len, _len1, _len2;
+        console.log(storeData);
+        columns = _this.get("columns");
+        rowFormatter = _this.get("rowFormatter");
+        paginator = _this.get("paginator");
+        filters = _this.get("filters");
+        for (_i = 0, _len = filters.length; _i < _len; _i++) {
+          filter = filters[_i];
+          if (filter.isSelected()) {
+            storeData = storeData.filter(function(element, index, array) {
+              return filter.filter(element, index, array);
+            });
+          }
         }
-      }
-      if (paginator) {
-        paginator.setTotalRecords(storeData.length);
-      }
-      from = 0;
-      to = 10;
-      if (paginator) {
-        from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage();
-        to = paginator.getCurrentPage() * paginator.getRowsPerPage();
-      }
-      storeData = this._data = storeData.slice(from, to);
-      this.tbodyEl.innerHTML = '';
-      for (i = _j = 0, _len1 = storeData.length; _j < _len1; i = ++_j) {
-        record = storeData[i];
-        trEl = this.tbodyEl.insertRow(i);
-        /*trEl.exData =
-            dataIndex: i
-        */
-
-        if (typeof rowFormatter === "function") {
-          rowFormatter(trEl, record);
+        if (paginator) {
+          from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage();
+          to = paginator.getCurrentPage() * paginator.getRowsPerPage();
         }
-        trEl.className = "ex-dt-" + (i % 2 ? 'odd' : 'even');
-        for (j = _k = 0, _len2 = columns.length; _k < _len2; j = ++_k) {
-          column = columns[j];
-          tdEl = trEl.insertCell(j);
-          /*tdEl.exData =
-              columnIndex: j
+        storeData = _this._data = storeData.slice(from, to);
+        _this.tbodyEl.innerHTML = '';
+        for (i = _j = 0, _len1 = storeData.length; _j < _len1; i = ++_j) {
+          record = storeData[i];
+          trEl = _this.tbodyEl.insertRow(i);
+          /*trEl.exData =
+              dataIndex: i
           */
 
-          tdEl.className = "ex-dt-col-" + column.key;
-          if (typeof column.formatter === "function") {
-            column.formatter(tdEl, column, record);
-          } else {
-            divEl = document.createElement("div");
-            divEl.className = "ex-dt-cell-inner";
-            divEl.appendChild(document.createTextNode(record[column.key]));
-            tdEl.appendChild(divEl);
+          if (typeof rowFormatter === "function") {
+            rowFormatter(trEl, record);
           }
-          if (column.hidden) {
-            tdEl.className += " hidden";
-            tdEl.style.display = "none";
+          trEl.className = "ex-dt-" + (i % 2 ? 'odd' : 'even');
+          for (j = _k = 0, _len2 = columns.length; _k < _len2; j = ++_k) {
+            column = columns[j];
+            tdEl = trEl.insertCell(j);
+            /*tdEl.exData =
+                columnIndex: j
+            */
+
+            tdEl.className = "ex-dt-col-" + column.key;
+            if (typeof column.formatter === "function") {
+              column.formatter(tdEl, column, record);
+            } else {
+              divEl = document.createElement("div");
+              divEl.className = "ex-dt-cell-inner";
+              divEl.appendChild(document.createTextNode(record[column.key]));
+              tdEl.appendChild(divEl);
+            }
+            if (column.hidden) {
+              tdEl.className += " hidden";
+              tdEl.style.display = "none";
+            }
           }
+          _this.tbodyEl.appendChild(trEl);
         }
-        this.tbodyEl.appendChild(trEl);
-      }
-      return console.timeEnd("Rendering data");
+        return console.timeEnd("Rendering data");
+      });
     };
 
     /*
@@ -381,7 +389,7 @@
       tdEl = event.currentTarget;
       columns = this.get("columns");
       store = this.get("store");
-      data = this.getData(tdEl.parentChild.rowIndex);
+      data = this.getData(tdEl.parentNode.rowIndex);
       column = columns[tdEl.cellIndex];
       return this.emit("onCellClick", {
         event: event,
@@ -466,8 +474,10 @@
 
 
     function Store(configs) {
-      this.setData(configs.data);
-      this.cfg = {};
+      if (configs == null) {
+        configs = {};
+      }
+      this.cfg = configs;
     }
 
     /*
@@ -483,16 +493,12 @@
 
     /*
      * Get the data
-     * @param {Number} index
      * @return {Object}
     */
 
 
-    Store.prototype.getData = function(index) {
-      if (typeof index !== "number") {
-        return this._data;
-      }
-      return this._data[index];
+    Store.prototype.getData = function(sortedBy, callback) {
+      return typeof callback === "function" ? callback(this._data) : void 0;
     };
 
     /*
@@ -549,9 +555,22 @@
 
     __extends(ArrayStore, _super);
 
+    ArrayStore.prototype.paginator = null;
+
     function ArrayStore(configs) {
-      ArrayStore.__super__.constructor.apply(this, arguments);
+      ArrayStore.__super__.constructor.call(this, configs);
+      if (configs.data) {
+        this.setData(configs.data);
+      }
     }
+
+    ArrayStore.prototype.setData = function(data) {
+      var paginator;
+      ArrayStore.__super__.setData.call(this, data);
+      if (paginator = this.get("paginator")) {
+        return paginator.setTotalRecords(this._data.length);
+      }
+    };
 
     /*
      * Sort the data
@@ -561,8 +580,10 @@
 
 
     ArrayStore.prototype.sort = function(key, dir) {
-      this.getData().sort(function(a, b) {
+      var _this = this;
+      this.getData(function(data) {
         var asc, val1, val2;
+        data.sort(function(a, b) {});
         asc = dir === "ASC";
         val1 = a[key];
         val2 = b[key];
@@ -628,17 +649,54 @@
 
   })(Ex.ArrayStore);
 
+  /*
+   * You should specify in the costructor the following parameters
+   * - url
+  */
+
+
   Ex.RemoteStore = (function(_super) {
 
     __extends(RemoteStore, _super);
 
+    RemoteStore.prototype.paginator = null;
+
     function RemoteStore(configs) {
-      RemoteStore.__super__.constructor.call(this, config);
+      RemoteStore.__super__.constructor.call(this, configs);
+      this.paginator = configs != null ? configs.paginator : void 0;
+      if (!configs.url) {
+        console.warning("You should specity the url");
+      }
     }
+
+    RemoteStore.prototype.getData = function(sortedBy, callback) {
+      var data, paginator,
+        _this = this;
+      paginator = this.get("paginator");
+      data = {};
+      if (paginator) {
+        data.results = paginator.getRowsPerPage();
+        data.startIndex = paginator.getCurrentPage();
+      }
+      data.key = sortedBy.key;
+      data.dir = sortedBy.dir;
+      return $.ajax({
+        url: this.get("url"),
+        type: "POST",
+        data: data,
+        dataType: "json",
+        success: function(response, textStatus, jqXHR) {
+          if (paginator) {
+            paginator.setTotalRecords(+response.totalRecords);
+          }
+          return typeof callback === "function" ? callback(response.records) : void 0;
+        }
+      });
+    };
 
     return RemoteStore;
 
-  })(Ex.ArrayStore);
+  })(Ex.Store);
 
   /*
    * Paginator 
@@ -657,6 +715,9 @@
       this.config = config;
       this._handlePageChange = function(event) {
         return Paginator.prototype._handlePageChange.apply(_this, arguments);
+      };
+      this._handleStateChange = function() {
+        return Paginator.prototype._handleStateChange.apply(_this, arguments);
       };
       this.render = function() {
         return Paginator.prototype.render.apply(_this, arguments);
