@@ -63,6 +63,7 @@
     return datatable = new Ex.DataTable("table", {
       columns: columns,
       store: xhrStore,
+      scrollable: true,
       rowFormatter: rowFormatter,
       paginator: new Ex.Paginator({
         container: '.pagination',

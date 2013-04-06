@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+	<head>
+	    <meta charset="utf-8">
+	    <title>Demo for Ex Datatable</title>
+
+	    <link rel="stylesheet" href="vendor/bootstrap/css/bootstrap.css">
+        <link rel="stylesheet" href="css/demo.css">
+        <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+        <!--[if lt IE 9]>
+        <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+    <head/>
+    
+    <body>
+        <div id="wrapper">
+            <header id="header">
+                <h1>Ex Datatable</h1>
+                <p class="lead">(v0.1 Alpha).</p>
+            </header>
+
+            <div class="container-fluid">
+              <div class="row-fluid">
+                  <div class="span3 bs-docs-sidebar">
+                    <ul class="nav nav-list bs-docs-sidenav">
+                        <li><a href="#p1"><i class="icon-chevron-right"></i>Basic Example</a></li>
+                        <li><a href="#p2"><i class="icon-chevron-right"></i>Progressive Enhancement</a></li>
+                    </ul>
+                  </div>
+                <div class="span9">
+
+                    <!-- part 1 -->
+                    <div id="p1">
+                        <div class="page-header">
+                            <h2>1. Basic Example</h2>
+                            <p>A demonstration of the DataTable's basic feature set.</p>
+                        </div>
+                        <ul class="nav nav-tabs">
+                            <li class="active"><a href="#p1-result">Result</a></li>
+                            <li><a href="#p1-data">Data</a></li>
+                            <li><a href="#p1-markup">Markup</a></li>
+                            <li><a href="#p1-coffee">Coffee</a></li>
+                            <li><a href="#p1-js">JavaScript</a></li>
+                        </ul>
+                         
+                        <div class="tab-content">
+                            <div class="tab-pane active" id="p1-result">
+                                <table class="table table-bordered table-striped" id="p1-table"></table>
+                            </div>
+                            <div class="tab-pane" id="p1-data">
+<pre class="prettyprint linenums">
+Ex.Examples.data = [
+  {id: 1, name: "Giovanni's Pizzaria", hone: "(408) 490-2658", city: "Sunnyvale", rating: 4}, 
+  {id: 2, name: "Canton Chinese Fast Food", phone: "(650) 961-1288", city: "Mountain View", rating: 8}, 
+  {id: 3, name: "Chef Lee Chinese Restaurant", phone: "(408) 734-3878", city: "Sunnyvale", rating: 4}, 
+  {id: 4, name: "Chipotle Mexican Grill", phone: "(408) 773-0247", city: "Sunnyvale", rating: 3}, 
+  {id: 5, name: "El Cerrito",phone: "(408) 745-7748",city: "San Jose", rating: 'N/A'}, 
+  {id: 6, name: "Express 7 Chinese Fast Food", phone: "(650) 960-7100", city: "Mountain View", rating: 6}, 
+  {id: 7, name: "Hong Kong Saigon Seafood", phone: "(408) 734-2828", city: "Sunnyvale", rating: 3}
+];
+</pre>
+                            </div>
+                            <div class="tab-pane" id="p1-markup">
+<pre class="prettyprint linenums">
+&lt;table class=&quot;table table-bordered table-striped&quot; id=&quot;p1-table&quot;&gt;&lt;/table&gt; 
+</pre>
+                            </div>
+                            <div class="tab-pane" id="p1-coffee">
+<pre class="prettyprint linenums">
+columnDefs = [
+    key: "id",
+    label: "ID"
+,
+    key: "name",
+    label: "Name"
+,
+    key: "phone",
+    label: "Phone"
+,
+    key: "city",
+    label: "City"
+,
+    key: "rating",
+    label: "Rating"
+]
+
+store = new Ex.ArrayStore
+    data: Ex.Examples.data
+
+datatable = new Ex.DataTable "#p1-table", 
+    columns : columnDefs
+    store   : store 
+</pre>
+                            </div>
+                            <div class="tab-pane" id="p1-js">
+<pre class="prettyprint linenums">
+var columnDefs,datatable,store;
+columnDefs = [
+    {key:"id",label:"ID"},
+    {key:"name",label:"Name"},
+    {key:"phone",label:"Phone"},
+    {key:"city",label:"City"},
+    {key:"rating",label:"Rating"}
+];
+store = new Ex.ArrayStore({data:Ex.Examples.data});
+datatable = new Ex.DataTable("#p1-table",{columns:columnDefs,store:store});
+</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="bs-docs-separator">
+                    <!-- end of part 1 -->
+
+
+                    <!-- part 2 -->
+                    <div id="p2">
+                        <div class="page-header">
+                            <h2>2. Progressive Enhancement</h2>
+                            <p>This example creates a DataTable instance based on markup that already exists on the page.</p>
+                        </div>
+                        <ul class="nav nav-tabs">
+                            <li class="active"><a href="#p2-result">Result</a></li>
+                            <li><a href="#p2-markup">Markup</a></li>
+                            <li><a href="#p2-coffee">Coffee</a></li>
+                            <li><a href="#p2-js">JavaScript</a></li>
+                        </ul>
+                         
+                        <div class="tab-content">
+                            <div class="tab-pane active" id="p2-result">
+                                <table class="table table-bordered table-striped" id="p2-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Due Date</th>
+                                            <th>Account Number</th>
+                                            <th>Quantity</th>
+                                            <th>Amount Due</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>1/23/1999</td>
+                                            <td>29e8548592d8c82</td>
+                                            <td>12</td>
+                                            <td>$150.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>5/19/1999</td>
+                                            <td>83849</td>
+                                            <td>8</td>
+                                            <td>$60.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>8/9/1999</td>
+                                            <td>11348</td>
+                                            <td>1</td>
+                                            <td>$34.99</td>
+                                        </tr>
+                                        <tr>
+                                            <td>1/23/2000</td>
+                                            <td>29e8548592d8c82</td>
+                                            <td>10</td>
+                                            <td>$1.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>4/28/2000</td>
+                                            <td>37892857482836437378273</td>
+                                            <td>123</td>
+                                            <td>$33.32</td>
+                                        </tr>
+                                        <tr>
+                                            <td>1/23/2001</td>
+                                            <td>83849</td>
+                                            <td>5</td>
+                                            <td>$15.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>9/30/2001</td>
+                                            <td>224747</td>
+                                            <td>14</td>
+                                            <td>$56.78</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-pane" id="p2-markup">
+<pre class="prettyprint linenums">
+&lt;table class=&quot;table table-bordered table-striped&quot; id=&quot;p2-table&quot;&gt;
+    &lt;thead&gt;
+        &lt;tr&gt;
+            &lt;th&gt;Due Date&lt;/th&gt;
+            &lt;th&gt;Account Number&lt;/th&gt;
+            &lt;th&gt;Quantity&lt;/th&gt;
+            &lt;th&gt;Amount Due&lt;/th&gt;
+        &lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+        &lt;tr&gt;
+            &lt;td&gt;1/23/1999&lt;/td&gt;
+            &lt;td&gt;29e8548592d8c82&lt;/td&gt;
+            &lt;td&gt;12&lt;/td&gt;
+            &lt;td&gt;$150.00&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;5/19/1999&lt;/td&gt;
+            &lt;td&gt;83849&lt;/td&gt;
+            &lt;td&gt;8&lt;/td&gt;
+            &lt;td&gt;$60.00&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;8/9/1999&lt;/td&gt;
+            &lt;td&gt;11348&lt;/td&gt;
+            &lt;td&gt;1&lt;/td&gt;
+            &lt;td&gt;$34.99&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;1/23/2000&lt;/td&gt;
+            &lt;td&gt;29e8548592d8c82&lt;/td&gt;
+            &lt;td&gt;10&lt;/td&gt;
+            &lt;td&gt;$1.00&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;4/28/2000&lt;/td&gt;
+            &lt;td&gt;37892857482836437378273&lt;/td&gt;
+            &lt;td&gt;123&lt;/td&gt;
+            &lt;td&gt;$33.32&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;1/23/2001&lt;/td&gt;
+            &lt;td&gt;83849&lt;/td&gt;
+            &lt;td&gt;5&lt;/td&gt;
+            &lt;td&gt;$15.00&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;9/30/2001&lt;/td&gt;
+            &lt;td&gt;224747&lt;/td&gt;
+            &lt;td&gt;14&lt;/td&gt;
+            &lt;td&gt;$56.78&lt;/td&gt;
+        &lt;/tr&gt;
+    &lt;/tbody&gt;
+&lt;/table&gt;
+</pre>
+                            </div>
+                            <div class="tab-pane" id="p2-coffee">
+<pre class="prettyprint linenums">
+columnDefs = [
+    key: "due",
+    label: "Due Date"
+,
+    key: "account",
+    label: "Account Number"
+,
+    key: "quantity",
+    label: "Quantity"
+,
+    key: "amount",
+    label: "Amount Due"
+]
+
+store = new Ex.TableStore
+    container: "#p2-table"
+    fields: ["due", "account", "quantity", "amount"]
+
+datatable = new Ex.DataTable "#p2-table", 
+    columns : columnDefs
+    store   : store 
+</pre>
+                            </div>
+                            <div class="tab-pane" id="p2-js">
+<pre class="prettyprint linenums">
+var columnDefs,datatable,store;
+columnDefs = [
+    {key:"due",label:"Due Date"},
+    {key:"account",label:"Account Number"},
+    {key:"quantity",label:"Quantity"},
+    {key:"amount",label:"Amount Due"}
+];
+store = new Ex.TableStore({
+    container:"#p2-table",
+    fields:["due","account","quantity","amount"]
+});
+datatable = new Ex.DataTable("#p2-table",{columns:columnDefs,store:store});
+</pre>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- end of part 2 -->
+
+                </div>
+              </div>
+            </div>
+        </div>
+
+        <script src='vendor/jquery-1.9.1.js'></script>
+        <script src='vendor/bootstrap/js/bootstrap.js'></script>
+        <script src='vendor/google-code-prettify/prettify.js'></script>
+        <script src='../ex.datatable.js'></script>
+        <script src='js/demo.js'></script>
+    </body>
+</html>

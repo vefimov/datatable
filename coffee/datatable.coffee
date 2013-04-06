@@ -1,34 +1,4 @@
 ###
- * This work is licensed under the Creative Commons Attribution-NoDerivs 3.0 Unported License.
- * To view a copy of this license, visit http://creativecommons.org/licenses/by-nd/3.0/ or send a
- * letter to Creative Commons, 444 Castro Street, Suite 900, Mountain View, California, 94041, USA.
-###
-
-# define application namespace
-window.Ex ?= {}
-
-###
- * Provides and manages Ex.AttributeProvider instances
-###
-class Ex.AttributeProvider
-    jQuery.extend @prototype, EventEmitter.prototype
-    ###
-     * Sets the value of a config.
-    ###
-    set: (name, value) ->
-        @cfg ?= {}
-        #if @cfg[name] isnt value
-        @cfg[name] = value
-        @emit "#{name}Change", value
-
-    ###
-     * Returns the current value of the attribute.
-    ###
-    get: (name) ->
-        @cfg ?= {}
-        return @cfg[name]
-
-###
  * DataTable class
  * The constructor accepts the following parameters:
  *  - container {HTMLElement} Container element for the TABLE.
@@ -36,7 +6,7 @@ class Ex.AttributeProvider
 ###
 class Ex.DataTable
     $.extend @prototype, Ex.AttributeProvider.prototype
-
+    # data that that ware rendered to the datatable
     _data: []
 
     ###
@@ -47,6 +17,7 @@ class Ex.DataTable
             paginator: null
             columns: [] # Array of object literal Column definitions.
             store: null # DataSource instance
+            scrollable: false
             filters: []
             sortedBy:
                 key: null,
@@ -59,7 +30,7 @@ class Ex.DataTable
         @initEvents()
 
     ###
-     * Get data by index
+     * Get data
      * @param {Number} (Optional) index
      * @return {Object}
     ###
@@ -73,6 +44,7 @@ class Ex.DataTable
      * @param {Number} index - (Optional) New tree index
     ###
     addColumn: (column, index) ->
+        @trigger "beforeAddColumn", @, column, index
         columns = @get("columns")
         index = columns.length unless index
         columns.splice index, 0, column
@@ -87,6 +59,7 @@ class Ex.DataTable
         columns = @get("columns")
         for column, i in columns
             if column?.key is key
+                @trigger "beforeRemoveColumn", @, column, key
                 columns.splice i,1
                 jQuery(".ex-dt-col-#{key}").remove()
 
@@ -95,6 +68,7 @@ class Ex.DataTable
      * @param {String} key - the key of the column
     ###
     showColumn: (key) ->
+        @trigger "beforeShowColumn", @, key
         jQuery(".ex-dt-col-#{key}").show()
 
     ###
@@ -102,6 +76,7 @@ class Ex.DataTable
      * @param {String} key - the key of the column
     ###
     hideColumn: (key) ->
+        @trigger "beforeHideColumn", @, key
         jQuery(".ex-dt-col-#{key}").hide()
 
     ###
@@ -110,11 +85,12 @@ class Ex.DataTable
      * @param {String} dir - ASC or DESC
     ###
     sortColumn: (column, dir) ->
+        @trigger "beforeSortColumn", @, column, dir
         @set("sortedBy", key: column.key, dir: dir)
-        $(column.thEl).addClass("ex-dt-#{dir.toLowerCase()}")
-            .parent().find(".ex-dt-asc, .ex-dt-desc").removeClass("ex-dt-asc ex-dt-desc")
+        $container = jQuery @container
+        $thEl = jQuery column.thEl
 
-        @getStore().sort column.key, dir
+        $thEl.addClass("ex-dt-#{dir.toLowerCase()}").siblings().removeClass("ex-dt-asc ex-dt-desc")
         @refresh()
 
     ###
@@ -127,9 +103,12 @@ class Ex.DataTable
             paginator.on "rowsPerPageChange", @refresh
 
         # listen paginator events
-        ###if paginator
+        if paginator
             @getStore().on "onDataChange", (data) ->
-                paginator.setTotalRecords data.length###
+                if data?.totalRecords
+                    paginator.setTotalRecords data.totalRecords
+                else
+                    paginator.setTotalRecords data.length
 
         # listen filters events
         for filter in @get("filters")
@@ -163,10 +142,12 @@ class Ex.DataTable
      * Render the TH elements
     ###
     renderColumns: ->
+        @trigger "beforeRenderColumns", @
         @theadEl.innerHTML = ''
 
         theadRowEl = @theadEl.insertRow 0
         columns = @get("columns")
+        sortedBy = @cfg.sortedBy
 
         for column, i in columns
             # create the th element
@@ -176,8 +157,15 @@ class Ex.DataTable
             thEl.width = column.width if column.width
 
             classes = ["ex-dt-col-#{column.key}"]
+            # set as sortable by default
+            column.sortable = true unless column.sortable?
+
             # add css classes to th element
-            classes.push("ex-dt-sortable") if column.sortable
+            if column.sortable
+                classes.push("ex-dt-sortable") 
+                sortedBy.key = column.key unless sortedBy.key
+
+            # add classes to the hidden columns
             if column.hidden
                 classes.push("ex-dt-hidden")
                 thEl.style.display = "none"
@@ -198,6 +186,7 @@ class Ex.DataTable
      * Renders the view with existing records
     ###
     render: =>
+        @trigger "beforeTElements", @
         # build table structure
         @theadEl = @container.appendChild @container.createTHead()
         @tbodyEl = @container.appendChild @container.createTBody()
@@ -209,24 +198,25 @@ class Ex.DataTable
         else
             @refresh()
 
+    ###
+     * Re-render records in the datatable
+    ###
     refresh: =>
-        console.time("Rendering data")
+        @trigger "beforeRefresh", @
+        sortedBy = @cfg.sortedBy
         #tore = @getStore()
-        @getStore().getData @cfg.sortedBy, (storeData) =>
-            console.log storeData
+        @getStore().compute sortedBy.key, sortedBy.dir, (storeData) =>
             columns = @get("columns")
             #sortedBy = @get("sortedBy")
             rowFormatter = @get("rowFormatter")
             paginator = @get("paginator")
             filters = @get("filters")
 
-            #if filters.length
+            # data filtering
             for filter in filters
                 if filter.isSelected()
                     storeData = storeData.filter (element, index, array)->
                         filter.filter(element, index, array)
-
-            #paginator.setTotalRecords(storeData.length) if paginator
 
             if paginator
                 from = (paginator.getCurrentPage() - 1) * paginator.getRowsPerPage()
@@ -238,17 +228,11 @@ class Ex.DataTable
 
             for record, i in storeData
                 trEl = @tbodyEl.insertRow i
-                #trEl.exData = record:recor
-                ###trEl.exData =
-                    dataIndex: i###
                 rowFormatter?(trEl, record)
                 trEl.className = "ex-dt-#{if i % 2 then 'odd' else 'even'}"
 
                 for column, j in columns
                     tdEl = trEl.insertCell j
-                    ###tdEl.exData =
-                        columnIndex: j###
-
                     tdEl.className = "ex-dt-col-#{column.key}"
 
                     # call cell formatter
@@ -267,7 +251,7 @@ class Ex.DataTable
 
                 @tbodyEl.appendChild trEl
 
-            console.timeEnd("Rendering data")
+            @trigger "afterRefresh", @
 
     ###
      * Invokes when a cell has a click.
@@ -280,7 +264,7 @@ class Ex.DataTable
 
         data = @getData(tdEl.parentNode.rowIndex)
         column = columns[tdEl.cellIndex]
-        @emit "onCellClick",
+        @trigger "onCellClick",
             event: event
             column: column
             store: store
@@ -294,7 +278,7 @@ class Ex.DataTable
         trEl = event.currentTarget
         data = @_data[trEl.rowIndex]
         store = @get("store")
-        @emit "onRowClick",
+        @trigger "onRowClick",
             event: event
             store: store = @get("store")
             data: data
@@ -308,7 +292,7 @@ class Ex.DataTable
         columns = @get("columns")
         column = columns[thEl.cellIndex]
 
-        @emit "onThClick",
+        @trigger "onThClick",
             event: event
             column: column
             store: store = @get("store")
@@ -317,437 +301,5 @@ class Ex.DataTable
             dir = if @get("sortedBy").dir is "ASC" then "DESC" else "ASC"
             # Update UI via sortedBy
             @sortColumn column, dir
-
-### ********************************************************************** ###
-### ********************************************************************** ###
-### ********************************************************************** ###
-
-###
- * The Store class encapsulates a client side cache of Model objects
- * The constructor accepts the following parameters:
- *  - configs {Object} (optional) Object literal of configuration values.
-###
-class Ex.Store
-    $.extend @prototype, Ex.AttributeProvider.prototype
-
-    _data: []
-
-    ###
-     * @constructor
-    ###
-    constructor: (configs) ->
-        configs ?= {}
-        @cfg = configs
-
-    ###
-     * Set the data
-     * @param {Object} data
-    ###
-    setData: (data) ->
-        @_data = jQuery.extend [], data
-        @emit "onDataChange", @_data
-
-    ###
-     * Get the data
-     * @return {Object}
-    ###
-    getData: (sortedBy, callback) ->
-        callback?(@_data)
-
-    ###
-     * Remove record from store
-     * @param {Number, Function}
-    ###
-    remove: (item) ->
-        switch typeof(item)
-            when "number"
-                @_data.splice item, 1
-            when "function"
-                for record, i in @data
-                    result = item(record,i)
-                    if result is true
-                        @_data.splice index, 1
-                    else if result is false
-                        break
-    ###
-     * Sort the data
-     * @param {String} key - the key by with sort data
-     * @param {String} dir - ASC or DESC
-    ###
-    sort: (key, dir) ->
-
-
-###
- * Small helper class to make creating stores from Array data easier
- * @namespace Ex
- * @class ArrayStore
- * @extends Ex.Store
-###
-class Ex.ArrayStore extends Ex.Store
-    paginator: null
-
-    constructor: (configs) ->
-        super configs
-        @setData configs.data if configs.data
-
-    setData: (data) ->
-        super data
-        if paginator = @get("paginator")
-            paginator.setTotalRecords(@_data.length)
-
-    ###
-     * Sort the data
-     * @param {String} key - the key by with sort data
-     * @param {String} dir - ASC or DESC
-    ###
-    sort: (key, dir) ->
-        # sort the data
-        @getData (data) =>
-            data.sort (a, b) ->
-            asc = dir is "ASC"
-            val1 = a[key]
-            val2 = b[key]
-            if val1 < val2
-                return if asc then -1 else 1
-            if val1 is val2
-                return 0
-            else
-                return if asc then 1 else -1
-
-        @emit "onDataChange", @getData()
-
-###
- * Small helper class to make creating stores from HTML table easier
- * @namespace Ex
- * @class TableStore
- * @extends Ex.ArrayStore
-###
-class Ex.TableStore extends Ex.ArrayStore
-    constructor: (configs) ->
-        fields = config.fields
-        data = []
-        jQuery("tbody tr", configs.container).each (key, rowEl) ->
-            cells = $(rowEl).find(">td")
-            for field, i in fields
-                obj = {}
-                obj[field] = cells.eq(i).text()
-                data.push obj
-        configs =
-            data: data
-        super config
-
-###
- * You should specify in the costructor the following parameters
- * - url
-###
-class Ex.RemoteStore extends Ex.Store
-    paginator: null
-
-    constructor: (configs) ->
-        super configs
-        @paginator = configs?.paginator
-        console.warning "You should specity the url" unless configs.url
-
-    getData: (sortedBy, callback) ->
-        paginator = @get("paginator")
-        data = {}
-
-        if paginator
-            data.results = paginator.getRowsPerPage()
-            data.startIndex = paginator.getCurrentPage()
-
-        data.key = sortedBy.key
-        data.dir = sortedBy.dir
-
-        $.ajax
-            url: @get("url")
-            type: "POST"
-            data: data
-            dataType: "json"
-            success:(response, textStatus, jqXHR) =>
-                if paginator
-                    paginator.setTotalRecords(+response.totalRecords)
-
-                callback?(response.records)
-###
- * Paginator 
- * Parameters:
- *    config <Object> Object literal to set instance and ui component configuration.
-###
-class Ex.Paginator
-    $.extend @prototype, Ex.AttributeProvider.prototype
-
-    #_currentPage: 1
-
-    constructor: (@config) ->
-        defaults =
-            rowsPerPage: 30
-            rowsPerPageSelect: null
-            container: ''
-            totalRecords: 0
-            currentPage: 1
-            alwaysVisible: false
-
-        config = $.extend(defaults, config)
-        config.container = $(config.container).eq(0)
-        #config.rowsPerPageSelect = $(config.containers)
-        @cfg = config
-
-        @_initUIComponents()
-        @initEvents()
-        @_selfSubscribe()
-        #@updateState()
-        @setPage 1
-
-    updateVisibility: =>
-        container = @get("container")
-        prev = container.find(".ex-pg-first, .ex-pg-prev")
-        next = container.find(".ex-pg-last, .ex-pg-next")
-
-        if (prev.hasClass("disabled") && @hasPrevPage()) || !@hasPrevPage()
-            prev.toggleClass("disabled")
-        if (next.hasClass("disabled") && @hasNextPage()) || !@hasNextPage()
-            next.toggleClass("disabled")
-
-    ###
-     * Render the pagination controls per the format attribute into the specified container nodes.
-    ###
-    render: =>
-        totalRecords = @getTotalRecords()
-        #rowsPerPage = +@get("rowsPerPage")
-        container = @get("container")
-        currentPage = @getCurrentPage()
-
-
-        container.find(".ex-pg-page").remove()
-        nextEl = container.find(".ex-pg-next").get(0)
-        ulEl = container.find(">ul").get(0)
-
-        totalPages = @getTotalPages()
-
-        # conditions to align active page by center
-        to = currentPage + 4
-        from = currentPage - 4
-
-        if from <= 0
-            to += Math.abs(from) + 1
-            from = 1
-        if to > totalPages
-            from -= to - totalPages
-            to = totalPages
-
-        from = 1 if from <= 0
-        to = totalPages if to > totalPages
-
-        i = from
-        while i <= to
-            liEl = document.createElement "li"
-            liEl.className = "ex-pg-page"
-
-            linkEl = document.createElement "a"
-            linkEl.href = "#"
-            linkEl.textContent = i
-
-            liEl.className += " active" if i is currentPage
-            liEl.setAttribute "data-page", i
-            liEl.appendChild linkEl
-
-            #console.log ulEl
-            #ulEl.appendChild liEl
-            ulEl.insertBefore(liEl, nextEl)
-
-            ###liEl = jQuery("<li />", class: "ex-pg-page").append(
-              jQuery("<a />", href: "#", text: i)
-            )
-            
-            liEl.addClass("active") if i is currentPage
-            liEl.insertBefore(nextEl)
-            liEl.data("page", i)###
-
-            i++
-
-    getTotalRecords: ->
-        return +@get("totalRecords")
-
-    ###
-     * Set the total number of records.
-    ###
-    setTotalRecords: (total) ->
-        @set("totalRecords", total) unless @getTotalRecords() is total
-
-
-    getRowsPerPage: ->
-        return @get("rowsPerPage")
-
-    ###
-     * Set the number of rows per page.
-    ###
-    setRowsPerPage: (number) ->
-        return @set("rowsPerPage", number)
-
-    ###
-     * Get the page number corresponding to the current record offset.
-    ###
-    getCurrentPage: ->
-        return @get("currentPage")
-
-    ###
-     * Set the current page to the provided page number if possible.
-     * Parameters:
-     *  newPage <number> the new page number
-    ###
-    setPage: (newPage) ->
-        if @hasPage(newPage)
-            @set("currentPage", newPage)
-
-    getTotalPages: ->
-        totalPages = @getTotalRecords() / @getRowsPerPage()
-        totalPages++ if totalPages > Math.floor(totalPages)
-        Math.floor(totalPages)
-
-    ###
-     * Does the requested page have any records?
-    ###
-    hasPage: (page) ->
-        return false if page < 1
-        page <= @getTotalPages()
-
-    ###
-     * Are there records on the next page?
-    ###
-    hasNextPage: () ->
-        @hasPage @getCurrentPage() + 1
-
-    ###
-     * Is there a page before the current page?
-    ###
-    hasPrevPage: () ->
-        @hasPage @getCurrentPage() - 1
-
-
-    ###
-     *  Fires the pageChange event when the state attributes have changed
-    ###
-    _handleStateChange: =>
-        totalPages = @getTotalPages()
-
-        if totalPages <= 1
-            @get("container").hide("fast") unless @get("alwaysVisible")
-        else unless @get("alwaysVisible")
-            @get("container").show("fast")
-
-        if @getCurrentPage() > totalPages
-            @setPage totalPages
-
-        @render()
-        @updateVisibility()
-
-    ###
-     *  Fires the pageChange event when the state attributes have changed
-    ###
-    _handlePageChange: (event) =>
-        target = $(event.currentTarget)
-        currentPage = @getCurrentPage()
-        totalPages = @getTotalPages()
-
-        page = target.data("page")
-
-        if page is "prev"
-            page = currentPage - 1
-        else if page is "next"
-            page = currentPage + 1
-        else if page is "last"
-            page = totalPages
-
-        @setPage +page unless page is currentPage
-
-    initEvents: ->
-        @get("container").on "click", "li", @_handlePageChange
-
-        if select = @get("rowsPerPageSelect")
-            select = jQuery select
-            select.on "change", (event) =>
-                @set "rowsPerPage", select.val()
-
-    #@on "rowsPerPageChange", (value) =>
-    # select.val value
-
-    ###
-     * Subscribes to instance attribute change events to automate certain behaviors.
-    ###
-    _selfSubscribe: ->
-        @on "rowsPerPageChange", @_handleStateChange
-        @on "totalRecordsChange", @_handleStateChange
-        @on "currentPageChange", @render
-        @on "currentPageChange", @updateVisibility
-
-
-    _initUIComponents: ->
-        ulEl = jQuery("<ul />", class: "ex-pg")
-        ulEl.append(
-            jQuery("<li />", class: "ex-pg-first").append(jQuery("<a />", href: "#", text: "First")).data("page", 1)
-            jQuery("<li />", class: "ex-pg-prev").append(jQuery("<a />", href: "#", text: "Prev")).data("page", "prev")
-            jQuery("<li />", class: "ex-pg-next").append(jQuery("<a />", href: "#", text: "Next")).data("page", "next")
-            jQuery("<li />", class: "ex-pg-last").append(jQuery("<a />", href: "#", text: "Last")).data("page", "last")
-        )
-
-        @get("container").empty().append(ulEl)
-
-
-class Ex.Filter
-    $.extend @prototype, Ex.AttributeProvider.prototype
-
-    constructor: (config) ->
-
-    filter: (element, index, array) ->
-
-    isSelected: ->
-
-class Ex.Filter.Search extends Ex.Filter
-    constructor: (config) ->
-        super
-        defaults =
-            container: null
-            filterFn: @_applyFilters
-            valueUpdate: 'keydown' # keyup, keypress
-            value: ''
-
-        @cfg = $.extend(defaults, config)
-        @cfg.container = jQuery @cfg.container
-        @initEvents()
-
-    initEvents: ->
-        event = @get("valueUpdate")
-        @get("container").on event, Ex.util.throttle((event) =>
-            @set "value", jQuery(event.target).val()
-        , 100)
-
-    filter: (element, index, array) ->
-        @get("filterFn")?(element, index, array)
-
-    isSelected: ->
-        !!@get("value")
-
-    _applyFilters: (element, index, array) =>
-        value = @get("value").toLowerCase()
-        predicate = false
-        for name, record of element
-            if ~((record + "").toLowerCase().indexOf(value))
-                predicate = true
-                break
-        predicate
-
-
-Ex.util ?= {}
-# Throttling function calls
-Ex.util.throttle = (fn, delay) ->
-    timer = null
-    ->
-        context = this
-        args = arguments
-        clearTimeout timer
-        timer = setTimeout(->
-            fn.apply context, args
-        , delay)
         
         
