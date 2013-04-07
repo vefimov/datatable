@@ -5,7 +5,7 @@
  *    config <Object> Object literal to set instance and ui component configuration.
 ###
 class Ex.Paginator
-    $.extend @prototype, Ex.AttributeProvider.prototype
+    jQuery.extend @prototype, Ex.AttributeProvider.prototype
 
     #_currentPage: 1
 
@@ -18,14 +18,13 @@ class Ex.Paginator
             currentPage: 1
             alwaysVisible: false
 
-        config = $.extend(defaults, config)
-        config.container = $(config.container).eq(0)
-        @cfg = config
+        @cfg = jQuery.extend(defaults, config)
+        @cfg.container = jQuery(@cfg.container).eq(0)
 
         @_initUIComponents()
         @_initEvents()
         @_selfSubscribe()
-        @setPage 1
+        @render()
 
     ### 
      * Hides the containers if there is only one page of data and attribute alwaysVisible is false. 
@@ -179,7 +178,7 @@ class Ex.Paginator
      *  Fires the pageChange event when the state attributes have changed
     ###
     _handlePageChange: (event) =>
-        target = $(event.currentTarget)
+        target = jQuery(event.currentTarget)
         currentPage = @getCurrentPage()
         totalPages = @getTotalPages()
 
@@ -223,4 +222,4 @@ class Ex.Paginator
             jQuery("<li />", class: "ex-pg-last").append(jQuery("<a />", href: "#", text: "Last")).data("page", "last")
         )
 
-        @get("container").empty().append(ulEl)
+        @get("container").css(display:"none").empty().append(ulEl)

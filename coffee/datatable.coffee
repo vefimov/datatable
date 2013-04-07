@@ -5,7 +5,7 @@
  *  - configs {Object} (optional) Object literal of configuration values.
 ###
 class Ex.DataTable
-    $.extend @prototype, Ex.AttributeProvider.prototype
+    jQuery.extend @prototype, Ex.AttributeProvider.prototype
     # data that that ware rendered to the datatable
     _data: []
 
@@ -24,10 +24,11 @@ class Ex.DataTable
                 dir: "ASC"
 
         @container = jQuery(container).empty().get(0)
-        @cfg = $.extend(defaults, configs)
+        @cfg = jQuery.extend(defaults, configs)
 
-        @render()
         @initEvents()
+        @render()
+        
 
     ###
      * Get data
@@ -87,10 +88,10 @@ class Ex.DataTable
     sortColumn: (column, dir) ->
         @trigger "beforeSortColumn", @, column, dir
         @set("sortedBy", key: column.key, dir: dir)
-        $container = jQuery @container
-        $thEl = jQuery column.thEl
+        jQuerycontainer = jQuery @container
+        jQuerythEl = jQuery column.thEl
 
-        $thEl.addClass("ex-dt-#{dir.toLowerCase()}").siblings().removeClass("ex-dt-asc ex-dt-desc")
+        jQuerythEl.addClass("ex-dt-#{dir.toLowerCase()}").siblings().removeClass("ex-dt-asc ex-dt-desc")
         @refresh()
 
     ###
@@ -187,9 +188,11 @@ class Ex.DataTable
     ###
     render: =>
         @trigger "beforeTElements", @
+        THead = document.createElement "thead"
+        TBody = document.createElement "tbody"
         # build table structure
-        @theadEl = @container.appendChild @container.createTHead()
-        @tbodyEl = @container.appendChild @container.createTBody()
+        @theadEl = @container.appendChild THead
+        @tbodyEl = @container.appendChild TBody
         @renderColumns()
 
         sortedBy = @get("sortedBy")
@@ -230,6 +233,7 @@ class Ex.DataTable
                 trEl = @tbodyEl.insertRow i
                 rowFormatter?(trEl, record)
                 trEl.className = "ex-dt-#{if i % 2 then 'odd' else 'even'}"
+                trEl.dataIndex = i
 
                 for column, j in columns
                     tdEl = trEl.insertCell j
@@ -241,7 +245,17 @@ class Ex.DataTable
                     else
                         divEl = document.createElement "div"
                         divEl.className = "ex-dt-cell-inner"
-                        divEl.appendChild document.createTextNode(record[column.key])
+
+                        key = column.key
+                        if record[key]
+                            if typeof record[key] is "function"
+                                text = record[key]()
+                            else
+                                text = record[key]
+                        else if typeof record.get is "function"
+                            text = record.get(key)
+
+                        divEl.appendChild document.createTextNode text
                         tdEl.appendChild divEl
 
                     if column.hidden
@@ -262,13 +276,9 @@ class Ex.DataTable
         columns = @get("columns")
         store = @get("store")
 
-        data = @getData(tdEl.parentNode.rowIndex)
+        data = @getData(tdEl.parentNode.dataIndex)
         column = columns[tdEl.cellIndex]
-        @trigger "onCellClick",
-            event: event
-            column: column
-            store: store
-            data: data
+        @trigger "onCellClick", event, column, store, data
 
     ###
      * Invokes when a row has a click.
@@ -276,12 +286,9 @@ class Ex.DataTable
     ###
     onRowClick: (event) =>
         trEl = event.currentTarget
-        data = @_data[trEl.rowIndex]
+        data = @_data[trEl.dataIndex]
         store = @get("store")
-        @trigger "onRowClick",
-            event: event
-            store: store = @get("store")
-            data: data
+        @trigger "onRowClick", event, store, data
 
     ###
      * Invokes when a col has a click.

@@ -71,7 +71,6 @@ class Ex.ArrayStore extends Ex.Store
      * @return {Object}
     ###
     compute: (key, dir, callback) ->
-        callback?(@_data)
         # sort the data
         data = @getData()
 

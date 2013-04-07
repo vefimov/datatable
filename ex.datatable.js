@@ -140,7 +140,7 @@
 
   Ex.DataTable = (function() {
 
-    $.extend(DataTable.prototype, Ex.AttributeProvider.prototype);
+    jQuery.extend(DataTable.prototype, Ex.AttributeProvider.prototype);
 
     DataTable.prototype._data = [];
 
@@ -179,9 +179,9 @@
         }
       };
       this.container = jQuery(container).empty().get(0);
-      this.cfg = $.extend(defaults, configs);
-      this.render();
+      this.cfg = jQuery.extend(defaults, configs);
       this.initEvents();
+      this.render();
     }
 
     /*
@@ -270,15 +270,15 @@
 
 
     DataTable.prototype.sortColumn = function(column, dir) {
-      var $container, $thEl;
+      var jQuerycontainer, jQuerythEl;
       this.trigger("beforeSortColumn", this, column, dir);
       this.set("sortedBy", {
         key: column.key,
         dir: dir
       });
-      $container = jQuery(this.container);
-      $thEl = jQuery(column.thEl);
-      $thEl.addClass("ex-dt-" + (dir.toLowerCase())).siblings().removeClass("ex-dt-asc ex-dt-desc");
+      jQuerycontainer = jQuery(this.container);
+      jQuerythEl = jQuery(column.thEl);
+      jQuerythEl.addClass("ex-dt-" + (dir.toLowerCase())).siblings().removeClass("ex-dt-asc ex-dt-desc");
       return this.refresh();
     };
 
@@ -395,10 +395,12 @@
 
 
     DataTable.prototype.render = function() {
-      var sortedBy;
+      var TBody, THead, sortedBy;
       this.trigger("beforeTElements", this);
-      this.theadEl = this.container.appendChild(this.container.createTHead());
-      this.tbodyEl = this.container.appendChild(this.container.createTBody());
+      THead = document.createElement("thead");
+      TBody = document.createElement("tbody");
+      this.theadEl = this.container.appendChild(THead);
+      this.tbodyEl = this.container.appendChild(TBody);
       this.renderColumns();
       sortedBy = this.get("sortedBy");
       if (sortedBy.key) {
@@ -419,7 +421,7 @@
       this.trigger("beforeRefresh", this);
       sortedBy = this.cfg.sortedBy;
       return this.getStore().compute(sortedBy.key, sortedBy.dir, function(storeData) {
-        var column, columns, divEl, filter, filters, from, i, j, paginator, record, rowFormatter, tdEl, to, trEl, _i, _j, _k, _len, _len1, _len2;
+        var column, columns, divEl, filter, filters, from, i, j, key, paginator, record, rowFormatter, tdEl, text, to, trEl, _i, _j, _k, _len, _len1, _len2;
         columns = _this.get("columns");
         rowFormatter = _this.get("rowFormatter");
         paginator = _this.get("paginator");
@@ -445,6 +447,7 @@
             rowFormatter(trEl, record);
           }
           trEl.className = "ex-dt-" + (i % 2 ? 'odd' : 'even');
+          trEl.dataIndex = i;
           for (j = _k = 0, _len2 = columns.length; _k < _len2; j = ++_k) {
             column = columns[j];
             tdEl = trEl.insertCell(j);
@@ -454,7 +457,17 @@
             } else {
               divEl = document.createElement("div");
               divEl.className = "ex-dt-cell-inner";
-              divEl.appendChild(document.createTextNode(record[column.key]));
+              key = column.key;
+              if (record[key]) {
+                if (typeof record[key] === "function") {
+                  text = record[key]();
+                } else {
+                  text = record[key];
+                }
+              } else if (typeof record.get === "function") {
+                text = record.get(key);
+              }
+              divEl.appendChild(document.createTextNode(text));
               tdEl.appendChild(divEl);
             }
             if (column.hidden) {
@@ -479,14 +492,9 @@
       tdEl = event.currentTarget;
       columns = this.get("columns");
       store = this.get("store");
-      data = this.getData(tdEl.parentNode.rowIndex);
+      data = this.getData(tdEl.parentNode.dataIndex);
       column = columns[tdEl.cellIndex];
-      return this.trigger("onCellClick", {
-        event: event,
-        column: column,
-        store: store,
-        data: data
-      });
+      return this.trigger("onCellClick", event, column, store, data);
     };
 
     /*
@@ -498,13 +506,9 @@
     DataTable.prototype.onRowClick = function(event) {
       var data, store, trEl;
       trEl = event.currentTarget;
-      data = this._data[trEl.rowIndex];
+      data = this._data[trEl.dataIndex];
       store = this.get("store");
-      return this.trigger("onRowClick", {
-        event: event,
-        store: store = this.get("store"),
-        data: data
-      });
+      return this.trigger("onRowClick", event, store, data);
     };
 
     /*
@@ -646,7 +650,7 @@
 
   Ex.Paginator = (function() {
 
-    $.extend(Paginator.prototype, Ex.AttributeProvider.prototype);
+    jQuery.extend(Paginator.prototype, Ex.AttributeProvider.prototype);
 
     function Paginator(config) {
       var defaults,
@@ -672,13 +676,12 @@
         currentPage: 1,
         alwaysVisible: false
       };
-      config = $.extend(defaults, config);
-      config.container = $(config.container).eq(0);
-      this.cfg = config;
+      this.cfg = jQuery.extend(defaults, config);
+      this.cfg.container = jQuery(this.cfg.container).eq(0);
       this._initUIComponents();
       this._initEvents();
       this._selfSubscribe();
-      this.setPage(1);
+      this.render();
     }
 
     /* 
@@ -886,7 +889,7 @@
 
     Paginator.prototype._handlePageChange = function(event) {
       var currentPage, page, target, totalPages;
-      target = $(event.currentTarget);
+      target = jQuery(event.currentTarget);
       currentPage = this.getCurrentPage();
       totalPages = this.getTotalPages();
       page = target.data("page");
@@ -957,7 +960,9 @@
         href: "#",
         text: "Last"
       })).data("page", "last"));
-      return this.get("container").empty().append(ulEl);
+      return this.get("container").css({
+        display: "none"
+      }).empty().append(ulEl);
     };
 
     return Paginator;
@@ -1082,9 +1087,6 @@
 
     ArrayStore.prototype.compute = function(key, dir, callback) {
       var data;
-      if (typeof callback === "function") {
-        callback(this._data);
-      }
       data = this.getData();
       data.sort(function(a, b) {
         var asc, val1, val2;
